@@ -17,6 +17,8 @@ bash tools/build_native_vot_apk_macos.sh
 
 The build script compiles the pinned fork's `mods/` source, compiles the native bridge, patches the verified Cobalt APK, signs the result, and checks the finished package. Generated APKs, downloaded binaries, dependencies, and signing keys are excluded from Git.
 
+The upstream Cobalt Actions artifact currently has a limited retention period. [BUILDING.md](BUILDING.md) explains how to use an existing copy with the pinned SHA-256 when the download is unavailable.
+
 ## Source layout
 
 - `third_party/TizenTube/`: pinned fork submodule; edit and commit JavaScript features there.
