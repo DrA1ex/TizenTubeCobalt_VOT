@@ -1,0 +1,11 @@
+.DS_Store
+build/
+dist/
+archive/releases/
+node_modules/
+*.apk
+*.apk.idsig
+*.wgt
+*.keystore
+*.p12
+tools/android-sdk/

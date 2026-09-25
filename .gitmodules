@@ -1,0 +1,3 @@
+[submodule "third_party/TizenTube"]
+	path = third_party/TizenTube
+	url = https://github.com/DrA1ex/TizenTube.git
