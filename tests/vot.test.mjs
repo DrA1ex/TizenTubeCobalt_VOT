@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { audioText } from '../third_party/TizenTube/mods/features/audioLocale.js';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
@@ -77,7 +78,8 @@ async function harness({ lang = 'en', auto = false, token = false, deferred = fa
         './votLanguageProbe.js': { probeVotLanguage: async () => 'en' },
         '../config.js': { configRead: key => config[key], configWrite: (key, value) => { config[key] = value; },
             configChangeEmitter: { addEventListener: (_, fn) => configEvents.push(fn) } },
-        '../ui/ytUI.js': { showToast() {} }
+        '../ui/ytUI.js': { showToast() {} },
+        '../features/audioLocale.js': { audioText }
     };
     const module = new vm.SourceTextModule(source, { context });
     await module.link(async specifier => {
@@ -256,6 +258,6 @@ test('standard worker preparation survives a direct-route 403 without asking for
     await assert.rejects(h.api.prepareVotTrack({ lively: false, targetLang: 'ru', videoId: 'english-video',
         media: h.media, signal: controller.signal, onStatus: status => {
             waiting = status.state === 'waiting'; controller.abort();
-        } }), /отменён/);
+        } }), /cancelled/);
     assert.equal(waiting, true);
 });

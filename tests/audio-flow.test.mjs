@@ -21,7 +21,7 @@ test('true or failing dub query still blocks implicit original fallback', async 
     for (const isDubbed of [() => true, () => { throw Error('unavailable'); }, () => ({ unknown: true })]) {
         const player = { ...tvTedSnapshotPlayer(), getAudioTrack: () => ({ id: 'und', isDubbed }) };
         globalThis.document = { querySelector: () => player };
-        try { await assert.rejects(ensureOriginal(), /оригинальная/); }
+        try { await assert.rejects(ensureOriginal(), /original track/); }
         finally { delete globalThis.document; }
     }
 });
@@ -47,14 +47,14 @@ test('single unnamed legacy track does not require a language or track setter', 
         try {
             assert.equal(audioInventory().originalLanguage, '');
             await ensureOriginal();
-            await assert.rejects(ensureOriginal({ isCurrent: () => false }), /отменён/);
+            await assert.rejects(ensureOriginal({ isCurrent: () => false }), /cancelled/);
         } finally { delete globalThis.document; }
     }
 });
 test('unknown multitrack and single explicit dub still cannot masquerade as original', async () => {
     for (const available of [[{ id: 'a.1' }, { id: 'b.1' }], [{ id: 'ru.1', isAutoDubbed: true }]]) {
         globalThis.document = { querySelector: () => ({ getAvailableAudioTracks: () => available }) };
-        try { await assert.rejects(ensureOriginal(), /оригинальная/); }
+        try { await assert.rejects(ensureOriginal(), /original track/); }
         finally { delete globalThis.document; }
     }
     assert.equal(normalizeTrack({ id: 'default' }).language, '');
@@ -266,7 +266,7 @@ test('track setter requires readback confirmation and does not run cancelled wor
     globalThis.document = { querySelector: () => ({ getAvailableAudioTracks: () => [{ id: 'en.1' }, { id: 'ru.2' }],
         getAudioTrack: () => selected, setAudioTrack: track => { calls++; selected = track; } }) };
     try {
-        await assert.rejects(selectYouTubeTrack('en.1', { isCurrent: () => false }), /отменён/);
+        await assert.rejects(selectYouTubeTrack('en.1', { isCurrent: () => false }), /cancelled/);
         assert.equal(calls, 0); await selectYouTubeTrack('en.1'); assert.equal(selected.id, 'en.1');
     } finally { delete globalThis.document; }
 });

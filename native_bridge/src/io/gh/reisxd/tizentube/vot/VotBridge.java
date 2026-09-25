@@ -152,7 +152,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                         try {
                             context.startActivity(new android.content.Intent(context, YandexAuthActivity.class)
                                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
-                        } catch (Exception e) { Toast.makeText(context, "Не удалось открыть вход. Используйте ввод токена.", Toast.LENGTH_LONG).show(); }
+                        } catch (Exception e) { Toast.makeText(context, NativeStrings.text("couldNotOpenSignInEnter"), Toast.LENGTH_LONG).show(); }
                     }
                 });
                 return "{\"ok\":true}";
@@ -188,19 +188,19 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
         final EditText input = new EditText(activity);
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        input.setHint("OAuth-токен Яндекса");
+        input.setHint(NativeStrings.text("yandexOAuthToken"));
         input.setTextSize(22);
         input.setPadding(32, 24, 32, 24);
         final AlertDialog dialog = new AlertDialog.Builder(activity)
-                .setTitle("Авторизация Яндекса · живые голоса")
-                .setMessage("Вставьте OAuth-токен из VOT / Яндекс. Можно использовать клавиатуру Android TV или вставку из буфера. Токен хранится зашифрованным в приложении и отправляется только Яндексу. Сохранение не проверяет срок действия токена.")
+                .setTitle(NativeStrings.text("yandexSignInExpressiveVoices"))
+                .setMessage(NativeStrings.text("pasteYourOAuthTokenFromVOT"))
                 .setView(input)
-                .setPositiveButton("Сохранить", null)
-                .setNegativeButton("Отмена", null)
-                .setNeutralButton("Удалить токен", new DialogInterface.OnClickListener() {
+                .setPositiveButton(NativeStrings.text("save"), null)
+                .setNegativeButton(NativeStrings.text("cancel"), null)
+                .setNeutralButton(NativeStrings.text("removeToken"), new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
                         tokenStore.clear();
-                        Toast.makeText(activity, "Токен удалён", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(activity, NativeStrings.text("tokenRemoved"), Toast.LENGTH_SHORT).show();
                     }
                 }).create();
         dialog.setOnShowListener(new DialogInterface.OnShowListener() {
@@ -210,10 +210,10 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                         try {
                             tokenStore.save(input.getText().toString());
                             input.setText("");
-                            Toast.makeText(activity, "Токен сохранён. Выберите «Живой голос» в VOT.", Toast.LENGTH_LONG).show();
+                            Toast.makeText(activity, NativeStrings.text("tokenSavedSelectExpressiveVoiceIn"), Toast.LENGTH_LONG).show();
                             dialog.dismiss();
                         } catch (Exception error) {
-                            input.setError("Проверьте токен: вставьте только значение, без ссылки.");
+                            input.setError(NativeStrings.text("checkTheTokenPasteOnlyIts"));
                         }
                     }
                 });
@@ -487,7 +487,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 if ("Authorization".equalsIgnoreCase(name)) {
                     if (!YANDEX_HOST.equals(uri.getHost())) throw new SecurityException("OAuth is restricted to Yandex");
                     String token = tokenStore.read();
-                    if (token.isEmpty()) throw new SecurityException("Добавьте OAuth-токен в настройках VOT");
+                    if (token.isEmpty()) throw new SecurityException(NativeStrings.text("addAnOAuthTokenInVOT"));
                     connection.setRequestProperty("Authorization", "OAuth " + token);
                     continue;
                 }
@@ -591,7 +591,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 reconcilePlayer();
             }
         } catch (Exception error) {
-            lastError = "Ошибка Android MediaPlayer";
+            lastError = NativeStrings.text("androidMediaPlayerError");
             releasePlayer();
             state = "error";
             Log.e(TAG, "Native playback failed: " + error.getClass().getSimpleName());
@@ -603,7 +603,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
         try {
             reconcilePlayerUnsafe();
         } catch (Exception error) {
-            lastError = "Не удалось синхронизировать аудио";
+            lastError = NativeStrings.text("couldNotSynchronizeAudio");
             releasePlayer();
             state = "error";
             Log.e(TAG, "Audio synchronization failed: " + error.getClass().getSimpleName());
@@ -681,7 +681,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 // A second D-pad seek can supersede the first before this callback.
                 reconcilePlayer();
                 } catch (Exception error) {
-                    lastError = "Ошибка завершения перемотки";
+                    lastError = NativeStrings.text("seekCompletionError");
                     releasePlayer();
                     state = "error";
                 }

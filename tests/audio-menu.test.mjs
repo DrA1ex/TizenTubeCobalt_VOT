@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { audioText } from '../third_party/TizenTube/mods/features/audioLocale.js';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
@@ -34,6 +35,7 @@ async function menuHarness() {
     const modules = {};
     const values = {
         '../config.js': { configRead: key => config[key] },
+        '../features/audioLocale.js': { audioText },
         '../features/audioTracks.js': { ...tracks, audioInventory: () => ({ tracks: [], originalLanguage: '' }) },
         '../features/audioFlow.js': { audioFlow: {
             snapshot: () => ({ status: 'waiting', target: 'ru' }), select: async choice => { selected = choice; },
@@ -70,14 +72,14 @@ test('real audio menu sections are short; absent YouTube tracks are not offered 
     }
     h.api.showAudioMenu('youtube');
     assert.equal(h.last.items.length, 1);
-    assert.equal(h.last.items[0].title.title, 'Других дорожек нет');
+    assert.equal(h.last.items[0].title.title, 'No other tracks');
     await h.api.audioMenuAction('AUDIO_CHOOSE', { provider: 'standard' });
     assert.equal(h.selected.provider, 'standard');
 });
 test('home menu contains preferences not unusable current-video choices', async () => {
     const h = await menuHarness(); h.home(); h.api.showAudioMenu();
     assert.equal(h.last.items.length, 3);
-    assert.ok(h.last.items.every(item => !item.title.title.includes('этого видео')));
+    assert.ok(h.last.items.every(item => !item.title.title.includes('this video')));
     const prefs = h.preferences.votSettings();
     assert.equal(prefs.options.length, 4);
     assert.ok(prefs.options.every(group => group.options.length <= 5));
@@ -88,7 +90,7 @@ test('home menu contains preferences not unusable current-video choices', async 
     assert.ok(automatic.options.every(option => option.name.length <= 24));
     assert.ok(automatic.options.every(option => option.subtitle.length <= 40));
     const provider = prefs.options.find(group => group.menuId === 'tt-audio-audioPreferredProvider');
-    assert.equal(provider.name, 'Источник перевода');
+    assert.equal(provider.name, 'Translation provider');
     assert.equal(provider.options.length, 3);
     assert.equal(h.preferences.audioVolumeSettings().options.length, 2);
 });

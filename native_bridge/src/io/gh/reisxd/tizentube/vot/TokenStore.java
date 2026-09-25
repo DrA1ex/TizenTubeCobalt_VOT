@@ -33,13 +33,13 @@ final class TokenStore {
     }
     synchronized void save(String value, long expiresAt) throws Exception {
         value = value.trim().replaceFirst("(?i)^OAuth\\s+", "");
-        if (!value.matches("[A-Za-z0-9_\\-\\.]{20,4096}")) throw new IllegalArgumentException("Некорректный формат OAuth-токена");
+        if (!value.matches("[A-Za-z0-9_\\-\\.]{20,4096}")) throw new IllegalArgumentException(NativeStrings.text("invalidOAuthTokenFormat"));
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.ENCRYPT_MODE, key());
         String encoded = Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP) + ":"
                 + Base64.encodeToString(cipher.doFinal(value.getBytes("UTF-8")), Base64.NO_WRAP);
         if (!context.getSharedPreferences(ALIAS, Context.MODE_PRIVATE).edit().putString("encrypted", encoded).putLong("expiresAt", expiresAt).commit())
-            throw new IllegalStateException("Не удалось сохранить токен");
+            throw new IllegalStateException(NativeStrings.text("couldNotSaveTheToken"));
     }
     synchronized String read() {
         try {

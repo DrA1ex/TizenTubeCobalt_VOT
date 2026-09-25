@@ -19,22 +19,22 @@ public final class OAuthCallback {
         } catch (Exception e) { return false; }
     }
     public static OAuthCallback parse(String url, String expectedState, long now) throws Exception {
-        if (!isCallback(url) || expectedState == null || expectedState.length() < 20) throw new Exception("Неверный адрес входа");
+        if (!isCallback(url) || expectedState == null || expectedState.length() < 20) throw new Exception(NativeStrings.text("invalidSignInAddress"));
         String fragment = new URI(url).getRawFragment();
         Map<String, String> values = new HashMap<>();
         if (fragment != null) for (String part : fragment.split("&")) {
             String[] pair = part.split("=", 2);
             String key = URLDecoder.decode(pair[0], "UTF-8");
-            if (values.containsKey(key)) throw new Exception("Повтор параметра авторизации");
+            if (values.containsKey(key)) throw new Exception(NativeStrings.text("duplicateAuthorizationParameter"));
             values.put(key, pair.length == 2 ? URLDecoder.decode(pair[1], "UTF-8") : "");
         }
-        if (!expectedState.equals(values.get("state"))) throw new Exception("Не совпало подтверждение входа. Попробуйте ещё раз.");
-        if (values.containsKey("error")) throw new Exception("Вход отменён или отклонён Яндексом");
+        if (!expectedState.equals(values.get("state"))) throw new Exception(NativeStrings.text("signInVerificationDidNotMatch"));
+        if (values.containsKey("error")) throw new Exception(NativeStrings.text("signInWasCancelledOrRejected"));
         String token = values.get("access_token");
-        if (token == null || !token.matches("[A-Za-z0-9_\\-\\.]{20,4096}")) throw new Exception("Яндекс не вернул токен");
+        if (token == null || !token.matches("[A-Za-z0-9_\\-\\.]{20,4096}")) throw new Exception(NativeStrings.text("yandexDidNotReturnAToken"));
         long seconds;
-        try { seconds = Long.parseLong(values.get("expires_in")); } catch (Exception e) { throw new Exception("Нет срока действия токена"); }
-        if (seconds <= 0 || seconds > (Long.MAX_VALUE - now) / 1000) throw new Exception("Неверный срок действия токена");
+        try { seconds = Long.parseLong(values.get("expires_in")); } catch (Exception e) { throw new Exception(NativeStrings.text("tokenExpirationIsMissing")); }
+        if (seconds <= 0 || seconds > (Long.MAX_VALUE - now) / 1000) throw new Exception(NativeStrings.text("invalidTokenExpiration"));
         return new OAuthCallback(token, now + seconds * 1000);
     }
 }

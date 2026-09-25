@@ -37,7 +37,7 @@ public final class YandexAuthActivity extends Activity {
                 }
                 @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
                     if (OAuthCallback.isCallback(url)) complete(url);
-                    else if (!allowed(url)) { view.stopLoading(); fail("Страница входа перенаправила на неподдерживаемый адрес"); }
+                    else if (!allowed(url)) { view.stopLoading(); fail(NativeStrings.text("theSignInPageRedirectedTo")); }
                 }
                 @Override public void onPageFinished(WebView view, String url) {
                     if (OAuthCallback.isCallback(url)) complete(url);
@@ -46,7 +46,7 @@ public final class YandexAuthActivity extends Activity {
             setContentView(web);
             web.requestFocus();
             web.loadUrl("https://" + OAuthCallback.HOST + "/v1/auth/handle");
-        } catch (Throwable e) { fail("На этой приставке недоступен WebView. Используйте пункт «Вставить токен вручную»."); }
+        } catch (Throwable e) { fail(NativeStrings.text("webviewIsUnavailableOnThisDevice")); }
     }
     private boolean allowed(String url) {
         Uri uri = Uri.parse(url);
@@ -58,7 +58,7 @@ public final class YandexAuthActivity extends Activity {
     private boolean navigate(String url) {
         if (finished) return true;
         if (OAuthCallback.isCallback(url)) { complete(url); return true; }
-        if (!allowed(url)) { fail("Неподдерживаемый адрес входа. Используйте ручной ввод токена."); return true; }
+        if (!allowed(url)) { fail(NativeStrings.text("unsupportedSignInAddressEnterThe")); return true; }
         Uri uri = Uri.parse(url);
         if ("oauth.yandex.ru".equals(uri.getHost()) && "/authorize".equals(uri.getPath())
                 && !state.equals(uri.getQueryParameter("state"))) {
@@ -77,7 +77,7 @@ public final class YandexAuthActivity extends Activity {
             OAuthCallback result = OAuthCallback.parse(url, state, System.currentTimeMillis());
             new TokenStore(this).save(result.token, result.expiresAt);
             finished = true;
-            Toast.makeText(this, "Яндекс: вход выполнен", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, NativeStrings.text("yandexSignedIn"), Toast.LENGTH_LONG).show();
             finish();
         } catch (Exception e) { fail(e.getMessage()); }
     }
@@ -85,8 +85,8 @@ public final class YandexAuthActivity extends Activity {
         if (finished) return;
         finished = true;
         if (web != null) web.stopLoading();
-        new AlertDialog.Builder(this).setTitle("Вход в Яндекс").setMessage(message)
-            .setPositiveButton("Закрыть", (dialog, which) -> finish()).setOnCancelListener(dialog -> finish()).show();
+        new AlertDialog.Builder(this).setTitle(NativeStrings.text("signInToYandex")).setMessage(message)
+            .setPositiveButton(NativeStrings.text("close"), (dialog, which) -> finish()).setOnCancelListener(dialog -> finish()).show();
     }
     @Override public void onBackPressed() { finish(); }
     @Override protected void onDestroy() {
