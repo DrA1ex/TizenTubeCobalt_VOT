@@ -2,7 +2,7 @@
 
 This project builds a RockTek GX1 Android TV APK by combining an official Cobalt Android APK with a TizenTube userscript and a native VOT audio bridge. The TizenTube source is developed in [our TizenTube fork](https://github.com/DrA1ex/TizenTube) and pinned here as a Git submodule. Cobalt is consumed as a verified prebuilt APK; its source tree is not part of this build.
 
-The current v8.8 configuration uses the Cobalt 27.lts.3 Android ARM (`armeabi-v7a`) QA artifact. The APK has passed local checks, but playback on a GX1 device has not yet been verified. A new video gets a fresh maximum-quality trial, while sustained stalls still trigger a step down and brief interruptions, seeks, and suspended timers are ignored. See [changes](CHANGELOG.md) and [Android installation](INSTALL-ANDROID.md).
+The current v8.8 release includes Cobalt 27.lts.3 Android APKs for `armeabi-v7a`, `arm64-v8a`, and `x86`. Playback on a GX1 device has not yet been verified. A new video gets a fresh maximum-quality trial, while sustained stalls still trigger a step down and brief interruptions, seeks, and suspended timers are ignored. See [changes](CHANGELOG.md), [Android installation](INSTALL-ANDROID.md), and the [build instructions](BUILDING.md).
 
 ## Build
 
@@ -11,11 +11,10 @@ Clone with the submodule, install the required tools, and follow [BUILDING.md](B
 ```bash
 git clone --recurse-submodules https://github.com/DrA1ex/TizenTubeCobalt_VOT.git
 cd TizenTubeCobalt_VOT
-bash tools/fetch_cobalt_27_lts3_android_arm.sh
-bash tools/build_native_vot_apk_macos.sh
+bash tools/build_all_native_vot_apks_macos.sh
 ```
 
-The build script compiles the pinned fork's `mods/` source, compiles the native bridge, patches the verified Cobalt APK, signs the result, and checks the finished package. Generated APKs, downloaded binaries, dependencies, and signing keys are excluded from Git.
+The build script compiles the pinned fork's `mods/` source, compiles the native bridge, patches each verified Cobalt APK, signs the results, and checks the finished packages. Generated APKs, downloaded binaries, dependencies, and signing keys are excluded from Git.
 
 The upstream Cobalt Actions artifact currently has a limited retention period. [BUILDING.md](BUILDING.md) explains how to use an existing copy with the pinned SHA-256 when the download is unavailable.
 

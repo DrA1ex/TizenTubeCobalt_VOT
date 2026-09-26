@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 BASE_APK="${1:-${VOT_BASE_APK:-$PROJECT_DIR/build/cobalt-27.lts.3/official/apks/Cobalt.apk}}"
-OUTPUT_APK="${2:-$PROJECT_DIR/TizenTube-Cobalt-VOT-v8.8-Cobalt27.3-GX1-armeabi-v7a.apk}"
+OUTPUT_APK="${2:-}"
 MODS_DIR="$PROJECT_DIR/third_party/TizenTube/mods"
 USERSCRIPT="$PROJECT_DIR/third_party/TizenTube/dist/userScript.js"
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk}"
@@ -12,7 +12,22 @@ SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/homebrew/share/android-commandlinetools}"
 SDK_BUILD="${VOT_BUILD_TOOLS:-$SDK_ROOT/build-tools/36.0.0}"
 ANDROID_JAR="${VOT_ANDROID_JAR:-$SDK_ROOT/platforms/android-35/android.jar}"
 APKTOOL="${VOT_APKTOOL_JAR:-$PROJECT_DIR/build/tools/apktool_3.0.3.jar}"
-EXPECTED_BASE_SHA256="037ec5fb1d5ab12be76e95bac5ca7ec94ce3e4f138c51ac61f71a6cef4c6b7cf"
+BASE_SHA256="$(shasum -a 256 "$BASE_APK" | awk '{print $1}')"
+ABI_COUNT="$(unzip -Z1 "$BASE_APK" | sed -nE 's#^lib/(armeabi-v7a|arm64-v8a|x86)/libchrobalt\.so$#\1#p' | wc -l | tr -d ' ')"
+if [[ "$ABI_COUNT" != "1" ]]; then
+    echo "error: expected exactly one supported libchrobalt.so ABI in $BASE_APK" >&2
+    exit 1
+fi
+ABI="$(unzip -Z1 "$BASE_APK" | sed -nE 's#^lib/(armeabi-v7a|arm64-v8a|x86)/libchrobalt\.so$#\1#p')"
+case "$ABI:$BASE_SHA256" in
+    "armeabi-v7a:037ec5fb1d5ab12be76e95bac5ca7ec94ce3e4f138c51ac61f71a6cef4c6b7cf" | \
+    "arm64-v8a:04516ca14b3adae5c34d0e4201eccfe75809254bfdb4fd8c382936d76ae98f3b" | \
+    "x86:a382c518090b49b82d30599159d7f5a1c4e50955a724b49315c07db87f1aa26a") ;;
+    *) echo "error: unsupported Cobalt base APK ABI or SHA-256: $ABI $BASE_SHA256" >&2; exit 1 ;;
+esac
+if [[ -z "$OUTPUT_APK" ]]; then
+    OUTPUT_APK="$PROJECT_DIR/TizenTube-Cobalt-VOT-v8.8-Cobalt27.3-$ABI.apk"
+fi
 
 if [[ ! -f "$MODS_DIR/package.json" ]]; then
     echo "error: initialize the TizenTube submodule: git submodule update --init" >&2
@@ -20,11 +35,6 @@ if [[ ! -f "$MODS_DIR/package.json" ]]; then
 fi
 if [[ ! -f "$BASE_APK" || ! -f "$ANDROID_JAR" || ! -x "$SDK_BUILD/d8" ]]; then
     echo "error: missing Cobalt APK or Android SDK; see BUILDING.md" >&2
-    exit 1
-fi
-actual_base_sha256="$(shasum -a 256 "$BASE_APK" | awk '{print $1}')"
-if [[ "$actual_base_sha256" != "$EXPECTED_BASE_SHA256" ]]; then
-    echo "error: Cobalt APK SHA-256 mismatch: $actual_base_sha256" >&2
     exit 1
 fi
 if [[ "$APKTOOL" == "$PROJECT_DIR/build/tools/apktool_3.0.3.jar" && ! -f "$APKTOOL" ]]; then

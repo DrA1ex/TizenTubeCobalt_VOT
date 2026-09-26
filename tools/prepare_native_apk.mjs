@@ -49,7 +49,10 @@ await writeFile(activityPath, activity);
 const integersPath = path.join(dir, 'res/values/integers.xml');
 const integers = await readFile(integersPath, 'utf8');
 await writeFile(integersPath, capVideoBufferBudget(integers));
-const libPath = path.join(dir, 'lib/armeabi-v7a/libchrobalt.so');
+const nativeAbis = (await readdir(path.join(dir, 'lib')))
+    .filter(abi => ['armeabi-v7a', 'arm64-v8a', 'x86'].includes(abi));
+if (nativeAbis.length !== 1) throw Error('Expected exactly one supported Cobalt ABI');
+const libPath = path.join(dir, 'lib', nativeAbis[0], 'libchrobalt.so');
 const lib = await readFile(libPath);
 const needle = Buffer.from('/userScript.js?v=');
 const suffix = lib.indexOf(needle);
@@ -69,4 +72,4 @@ if (prepared.baseline === 'tizentube-cobalt') {
 } else if (suffix >= 0) {
     throw Error('Unexpected userscript loader in official Cobalt');
 }
-console.log(`Patched ${prepared.baseline} (${callbackMatches[0]}), native lifecycle, embedded injection, and ${GX1_MAX_VIDEO_BUFFER_MB} MB video buffer cap.`);
+console.log(`Patched ${prepared.baseline} (${path.basename(path.dirname(libPath))}, ${callbackMatches[0]}), native lifecycle, embedded injection, and ${GX1_MAX_VIDEO_BUFFER_MB} MB video buffer cap.`);
