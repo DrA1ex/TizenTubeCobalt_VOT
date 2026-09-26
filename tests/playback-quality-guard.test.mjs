@@ -16,7 +16,7 @@ function fixture(fps = 60, preferred = 'auto') {
         return { itag: height, quality: item.quality, width: height * 16 / 9, height, fps, bitrate: height * 10000,
             mimeType: 'video/webm; codecs="vp9"' };
     });
-    h.video = { playbackRate: 1, currentTime: 0, paused: false, ended: false, seeking: false,
+    h.video = { playbackRate: 1, currentTime: 0, readyState: 4, paused: false, ended: false, seeking: false,
         buffered: { length: 1, start: () => 0, end: () => h.video.currentTime + h.buffer },
         getVideoPlaybackQuality: () => ({ totalVideoFrames: h.total, droppedVideoFrames: h.dropped }),
         ownerDocument: { defaultView: { MediaSource: { isTypeSupported: () => true } } } };
@@ -75,7 +75,10 @@ test('lower bitrate at the same FPS gets a playback trial, not a false claim of 
     h.guard(1.5);
     assert.deepEqual(h.calls, [['hd2160', 'hd2160', '313']]);
     h.formatId = '313';
-    for (const now of [8000, 11000, 14000]) h.guard(1.5, now);
+    h.video.currentTime = 0.75;
+    h.total += 30;
+    h.guard(1.5, 500);
+    for (const now of [1000, 1500, 2000]) h.guard(1.5, now);
     assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1440'], 'a confirmed but stalled lighter stream must fall back');
 });
 
@@ -123,10 +126,14 @@ test('pinning a format cannot indefinitely disable ABR during network starvation
     addLighter4K(h);
     h.guard();
     h.formatId = '313';
+    h.video.currentTime = 1;
+    h.guard(2, 500);
+    h.video.currentTime = 2;
+    h.guard(2, 1000);
     h.video.readyState = 2;
     h.buffer = 0;
-    h.guard(2, 1000);
-    h.guard(2, 5000);
+    h.guard(2, 1500);
+    h.guard(2, 3500);
     assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1440']);
 });
 
@@ -340,11 +347,14 @@ test('sustained buffered stalls step down once, then allow time for the switch',
     const h = fixture();
     h.guard();
     h.current = 'hd1440';
-    for (const now of [8000, 11000, 14000]) h.guard(2, now);
+    h.video.currentTime = 1;
+    h.total += 30;
+    h.guard(2, 500);
+    for (const now of [1000, 1500, 2000]) h.guard(2, now);
     assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1080']);
-    for (const now of [15000, 18000, 21000]) h.guard(2, now);
+    for (const now of [2500, 3000]) h.guard(2, now);
     assert.equal(h.calls.length, 2);
-    h.guard(1, 22000);
+    h.guard(1, 3500);
     assert.deepEqual(h.calls.at(-1), ['auto', 'auto']);
 });
 
@@ -352,12 +362,61 @@ test('frozen video with advancing audio clock also triggers buffered stall recov
     const h = fixture();
     h.guard();
     h.current = 'hd1440';
-    for (const now of [8000, 11000, 14000]) {
+    for (const now of [500, 1000, 1500, 2000]) {
         h.video.currentTime = now / 1000 * 2;
         h.guard(2, now);
     }
 
     assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1080']);
+});
+
+test('a normal-speed stream also steps down after a 1.5 second buffered freeze', () => {
+    const h = fixture();
+    h.guard(1, 0);
+    h.video.currentTime = 0.5;
+    h.total += 30;
+    h.guard(1, 500);
+    for (const now of [1000, 1500, 2000]) h.guard(1, now);
+    assert.deepEqual(h.calls, [['tiny', 'hd1440']]);
+    h.guard(1, 2500);
+    assert.equal(h.calls.length, 1, 'the recovery cap must persist at 1x');
+});
+
+test('normal-speed recovery verifies a lighter same-resolution format before stepping down', () => {
+    const h = fixture();
+    addLighter4K(h);
+    h.guard(1, 0);
+    for (const now of [500, 1000, 1500, 2000]) h.guard(1, now);
+    assert.deepEqual(h.calls, [['hd2160', 'hd2160', '313']]);
+    h.guard(1, 2500);
+    assert.equal(h.calls.length, 1, 'a pending format trial must not be undone at normal speed');
+    h.guard(1, 6000);
+    assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1440']);
+});
+
+test('a brief playback hiccup and a suspended timer do not lower quality', () => {
+    const h = fixture();
+    h.guard(1, 0);
+    h.video.currentTime = 0.5;
+    h.total += 30;
+    h.guard(1, 500);
+    h.guard(1, 1000);
+    h.video.currentTime = 1;
+    h.total += 30;
+    h.guard(1, 1500);
+    h.guard(1, 10000);
+    assert.deepEqual(h.calls, []);
+});
+
+test('a failed stall recovery write is retried on the next check', () => {
+    const h = fixture();
+    h.guard(1, 0);
+    const setQuality = h.player.setPlaybackQualityRange;
+    h.player.setPlaybackQualityRange = () => { throw Error('player transition'); };
+    for (const now of [500, 1000, 1500]) h.guard(1, now);
+    h.player.setPlaybackQualityRange = setQuality;
+    h.guard(1, 2000);
+    assert.deepEqual(h.calls, [['tiny', 'hd1440']]);
 });
 
 test('expected frame dropping at 120 source fps on a 60Hz screen is healthy', () => {

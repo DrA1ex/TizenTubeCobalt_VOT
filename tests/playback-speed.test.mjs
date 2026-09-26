@@ -51,7 +51,8 @@ test('configured speed survives video replacement and ignores translation audio 
     const documentRef = {
         querySelector: selector => selector === 'video' ? video : player,
         addEventListener: (type, fn, capture) => {
-            assert.ok(['canplay', 'ratechange', 'loadedmetadata'].includes(type));
+            assert.ok(['canplay', 'ratechange', 'loadedmetadata', 'waiting', 'stalled',
+                'playing', 'pause', 'seeking', 'seeked'].includes(type));
             assert.equal(capture, true); listener = fn;
         }
     };

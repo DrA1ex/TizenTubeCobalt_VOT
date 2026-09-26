@@ -1,5 +1,10 @@
 # Changelog
 
+## v8.7 — faster quality recovery
+
+- Detects sustained buffered freezes in about 1.5 seconds at any playback speed and checks empty-buffer stalls separately.
+- Retains same-resolution format trials, verifies the selected format, and steps down without reacting to short hiccups, seeks, or suspended timers. GX1 playback remains unverified.
+
 ## v8.6 — bilingual GX1/VOT interface
 
 - Adds Russian and English text for the audio menu, translation status, errors, and Android sign-in dialogs. English is used for other languages.
