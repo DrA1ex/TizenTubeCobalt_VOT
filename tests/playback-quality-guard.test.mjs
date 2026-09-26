@@ -173,7 +173,7 @@ test('new videos do not inherit the previous exact format ID', () => {
     h.id = 'second';
     h.formats.pop();
     h.guard(2, 1000);
-    assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1440']);
+    assert.deepEqual(h.calls.at(-1), ['auto', 'auto']);
 });
 
 test('a lighter 4K stream already playing after restart is not downgraded by the old range budget', () => {
@@ -365,6 +365,32 @@ test('a stalled 4K stream steps below an ignored 1440p cap', () => {
     assert.deepEqual(h.calls, [['tiny', 'hd1440'], ['tiny', 'hd1080']]);
     h.guard(2, 2500);
     assert.equal(h.calls.length, 2, 'the switch still gets time to settle');
+});
+
+test('a new video retries maximum quality after the previous video stepped down', () => {
+    const h = fixture();
+    h.guard(2, 0);
+    h.current = 'hd1440';
+    h.video.currentTime = 1;
+    h.total += 30;
+    h.guard(2, 500);
+    for (const now of [1000, 1500, 2000]) h.guard(2, now);
+    assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1080']);
+
+    h.id = 'second';
+    h.current = 'hd2160';
+    h.video.currentTime = 0;
+    h.guard(2, 3000);
+    assert.deepEqual(h.calls.at(-1), ['auto', 'auto']);
+    for (const now of [3500, 4000, 4500]) {
+        h.video.currentTime = (now - 3000) / 500;
+        h.total += 30;
+        h.guard(2, now);
+    }
+    assert.equal(h.calls.length, 3, 'healthy 4K playback keeps the new-video trial');
+
+    for (const now of [5000, 5500, 6000, 6500]) h.guard(2, now);
+    assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1440']);
 });
 
 test('an ignored cap with an empty buffer recovers before any progress sample', () => {

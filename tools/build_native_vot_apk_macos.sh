@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 BASE_APK="${1:-${VOT_BASE_APK:-$PROJECT_DIR/build/cobalt-27.lts.3/official/apks/Cobalt.apk}}"
-OUTPUT_APK="${2:-$PROJECT_DIR/TizenTube-Cobalt-VOT-v8.7-Cobalt27.3-GX1-armeabi-v7a.apk}"
+OUTPUT_APK="${2:-$PROJECT_DIR/TizenTube-Cobalt-VOT-v8.8-Cobalt27.3-GX1-armeabi-v7a.apk}"
 MODS_DIR="$PROJECT_DIR/third_party/TizenTube/mods"
 USERSCRIPT="$PROJECT_DIR/third_party/TizenTube/dist/userScript.js"
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk}"

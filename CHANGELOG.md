@@ -1,5 +1,9 @@
 # Changelog
 
+## v8.8 — retry maximum quality for each video
+
+- Resets the maximum-quality trial when a new video starts, so a previous video's recovery step does not limit healthy playback. Sustained stalls can still lower quality. GX1 playback remains unverified.
+
 ## v8.7 — faster quality recovery
 
 - Detects sustained buffered freezes in about 1.5 seconds at any playback speed and checks empty-buffer stalls separately.
