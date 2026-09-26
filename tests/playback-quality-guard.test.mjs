@@ -358,6 +358,36 @@ test('sustained buffered stalls step down once, then allow time for the switch',
     assert.deepEqual(h.calls.at(-1), ['auto', 'auto']);
 });
 
+test('a stalled 4K stream steps below an ignored 1440p cap', () => {
+    const h = fixture();
+    h.guard(2, 0);
+    for (const now of [500, 1000, 1500, 2000]) h.guard(2, now);
+    assert.deepEqual(h.calls, [['tiny', 'hd1440'], ['tiny', 'hd1080']]);
+    h.guard(2, 2500);
+    assert.equal(h.calls.length, 2, 'the switch still gets time to settle');
+});
+
+test('an ignored cap with an empty buffer recovers before any progress sample', () => {
+    const h = fixture();
+    h.guard(2, 0);
+    h.current = 'hd1440'; // The quality label can update before the video format does.
+    h.formatId = '2160';
+    h.video.readyState = 2;
+    h.buffer = 0;
+    for (const now of [500, 1000, 1500, 2000, 2500]) h.guard(2, now);
+    assert.deepEqual(h.calls, [['tiny', 'hd1440'], ['tiny', 'hd1080']]);
+
+    const startup = fixture();
+    startup.current = 'hd1440';
+    startup.guard(2, 0);
+    startup.video.readyState = 2;
+    startup.buffer = 0;
+    startup.guard(2, 500);
+    startup.guard(2, 3000);
+    assert.deepEqual(startup.calls, [],
+        'a safe stream without progress may just be loading');
+});
+
 test('frozen video with advancing audio clock also triggers buffered stall recovery', () => {
     const h = fixture();
     h.guard();
