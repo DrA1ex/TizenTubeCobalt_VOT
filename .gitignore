@@ -9,3 +9,5 @@ node_modules/
 *.keystore
 *.p12
 tools/android-sdk/
+*SHA256*
+*.sha256*
