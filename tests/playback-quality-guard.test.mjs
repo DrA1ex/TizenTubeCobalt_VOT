@@ -428,6 +428,16 @@ test('a new video retries maximum quality after the previous video stepped down'
     assert.deepEqual(h.calls.at(-1), ['hd1440', 'hd1440']);
 });
 
+test('raising speed after a new video starts ends its maximum-quality trial', () => {
+    const h = fixture();
+    h.guard(1, 0);
+    h.id = 'second';
+    h.guard(1, 500);
+    assert.deepEqual(h.calls, []);
+    h.guard(1.75, 1000);
+    assert.deepEqual(h.calls, [['tiny', 'hd1440']]);
+});
+
 test('auto leaves empty-buffer recovery to ABR after reaching the cap', () => {
     const h = fixture();
     h.guard(2, 0);
@@ -475,6 +485,17 @@ test('an ignored cap with an empty buffer recovers before any progress sample', 
         'a safe stream without progress may just be loading');
 });
 
+test('an ignored upper bound is pinned at the same resolution before stepping lower', () => {
+    const h = fixture(60, 'hd2160');
+    h.player.setPlaybackQualityRange = (min, max) => h.calls.push([min, max]);
+    for (const now of [0, 500, 1000, 1500, 2000, 2500, 3000]) {
+        h.video.currentTime = now / 500;
+        h.total += 30;
+        h.guard(2, now);
+    }
+    assert.deepEqual(h.calls, [['tiny', 'hd1440'], ['hd1440', 'hd1440']]);
+});
+
 test('frozen video with advancing audio clock also triggers buffered stall recovery', () => {
     const h = fixture();
     h.guard();
@@ -485,6 +506,16 @@ test('frozen video with advancing audio clock also triggers buffered stall recov
     }
 
     assert.deepEqual(h.calls.at(-1), ['hd1080', 'hd1080']);
+});
+
+test('delayed timer callbacks retain evidence of frozen frames while audio advances', () => {
+    const h = fixture();
+    h.guard(1, 0);
+    h.video.currentTime = 3;
+    h.guard(1, 3000);
+    h.video.currentTime = 6;
+    h.guard(1, 6000);
+    assert.deepEqual(h.calls, [['hd1440', 'hd1440']]);
 });
 
 test('batched Cobalt frame counters do not lower quality while media time advances', () => {
