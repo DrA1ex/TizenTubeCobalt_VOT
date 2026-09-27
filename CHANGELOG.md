@@ -1,5 +1,11 @@
 # Changelog
 
+## v8.9 — smoother accelerated playback
+
+- Applies a suitable quality limit when playback speed increases and a high-resolution stream becomes too demanding.
+- Recovers from sustained stalls and releases the previous video's quality limit when the next video starts.
+- Includes Cobalt 27.lts.3 Android packages for `armeabi-v7a`, `arm64-v8a`, and `x86`.
+
 ## v8.8 — retry maximum quality for each video
 
 - Resets the maximum-quality trial when a new video starts, so a previous video's recovery step does not limit healthy playback. Sustained stalls can still lower quality. GX1 playback remains unverified.

@@ -26,7 +26,7 @@ case "$ABI:$BASE_SHA256" in
     *) echo "error: unsupported Cobalt base APK ABI or SHA-256: $ABI $BASE_SHA256" >&2; exit 1 ;;
 esac
 if [[ -z "$OUTPUT_APK" ]]; then
-    OUTPUT_APK="$PROJECT_DIR/TizenTube-Cobalt-VOT-v8.8-Cobalt27.3-$ABI.apk"
+    OUTPUT_APK="$PROJECT_DIR/TizenTube-Cobalt-VOT-v8.9-Cobalt27.3-$ABI.apk"
 fi
 
 if [[ ! -f "$MODS_DIR/package.json" ]]; then
