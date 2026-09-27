@@ -401,7 +401,7 @@ test('a stalled 4K stream steps below an ignored 1440p cap', () => {
     assert.equal(h.calls.length, 2, 'the switch still gets time to settle');
 });
 
-test('a new video retries maximum quality after the previous video stepped down', () => {
+test('a new video retries maximum quality before limiting a sustained heavy stream', () => {
     const h = fixture();
     h.guard(2, 0);
     h.current = 'hd1440';
@@ -417,15 +417,56 @@ test('a new video retries maximum quality after the previous video stepped down'
     h.guard(2, 3000);
     applyPreferredQuality(h.player, 'hd2160');
     assert.equal(h.calls.length, 2, 'no quality write may restart the new 4K stream');
-    for (const now of [3500, 4000, 4500]) {
+    for (const now of [3500, 4000]) {
         h.video.currentTime = (now - 3000) / 500;
         h.total += 30;
         h.guard(2, now);
     }
-    assert.equal(h.calls.length, 2, 'healthy 4K playback keeps the new-video trial');
+    assert.equal(h.calls.length, 2, 'the new video must get a short 4K trial');
+    h.video.currentTime = 3;
+    h.total += 30;
+    h.guard(2, 4500);
+    assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1440']);
+});
 
-    for (const now of [5000, 5500, 6000, 6500]) h.guard(2, now);
-    assert.deepEqual(h.calls.at(-1), ['hd1440', 'hd1440']);
+test('a 1440p start does not time out the trial before the actual 4K60 upgrade', () => {
+    const h = fixture();
+    h.guard(1.75, 0);
+    h.id = 'second';
+    h.current = 'hd2160'; // Requested quality can precede the decoder switch.
+    h.formatId = '1440';
+    h.player.getVideoStats = () => ({ fmt: h.formatId, optimal_format: '2160p60' });
+    for (const now of [1000, 1500, 2000, 2500, 3000]) {
+        h.video.currentTime = now / 1000 * 1.75;
+        h.total += 30;
+        h.guard(1.75, now);
+    }
+    assert.deepEqual(h.calls, [['tiny', 'hd1440']],
+        'the recommended 4K quality must not be mistaken for the active format');
+    h.formatId = '2160';
+    for (const now of [3500, 4000, 4500, 5000]) {
+        h.video.currentTime = now / 1000 * 1.75;
+        h.total += 30;
+        h.guard(1.75, now);
+    }
+    assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1440'],
+        'the active 4K60 stream must be capped even while its clock and frames advance');
+    assert.equal(h.calls.length, 2);
+});
+
+test('a heavy current quality also ends the trial when exact format stats are unavailable', () => {
+    const h = fixture();
+    h.guard(1.75, 0);
+    h.id = 'second';
+    h.current = 'hd2160';
+    delete h.player.getVideoStats;
+    for (const now of [1000, 1500, 2000, 2500]) {
+        h.video.currentTime = now / 1000 * 1.75;
+        h.total += 30;
+        h.guard(1.75, now);
+    }
+    assert.deepEqual(h.calls.at(-1), ['tiny', 'hd1440']);
+    assert.equal(h.calls.length, 2);
 });
 
 test('raising speed after a new video starts ends its maximum-quality trial', () => {
