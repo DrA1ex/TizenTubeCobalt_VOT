@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Lets the YouTube player adapt video quality during playback instead of forcing resolution changes after brief stalls or seeks. This avoids quality drops and playback interruptions caused by repeated stream switches.
+- Ignores brief buffered `waiting` events during accelerated playback when video time and frames continue advancing. This prevents false rebuffer reports from repeatedly lowering the player's performance cap and interrupting the picture for unnecessary quality switches.
+- Keeps a configured quality for the current video when the player briefly hides its video ID or reports an incomplete format list.
 - Restores quality preferences left by earlier temporary limits once, without overriding a newer manual selection.
 
 ## v8.9 — smoother accelerated playback
