@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Lets the YouTube player adapt video quality during playback instead of forcing resolution changes after brief stalls or seeks. This avoids quality drops and playback interruptions caused by repeated stream switches.
+- Restores quality preferences left by earlier temporary limits once, without overriding a newer manual selection.
+
 ## v8.9 — smoother accelerated playback
 
 - Applies a suitable quality limit when playback speed increases and a high-resolution stream becomes too demanding.
