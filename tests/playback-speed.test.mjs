@@ -137,3 +137,14 @@ test('failed Cobalt API reset does not pretend the quality cap was cleared', () 
     assert.equal(applyPlaybackSpeed(2, { video, player, cobalt: true }).applied, false);
     assert.equal(video.playbackRate, 1);
 });
+
+test('Cobalt exposes the actual speed to UI consumers without changing its internal API rate', () => {
+    const h = cobaltPlayer();
+    applyPlaybackSpeed(1.75, { ...h, cobalt: true });
+    assert.equal(h.player.getPlaybackRate(), 1.75);
+    assert.deepEqual(h.calls, []);
+    const replacement = { playbackRate: 1 };
+    applyPlaybackSpeed(2, { player: h.player, video: replacement, cobalt: true });
+    assert.equal(h.player.getPlaybackRate(), 2);
+    assert.deepEqual(h.calls, []);
+});

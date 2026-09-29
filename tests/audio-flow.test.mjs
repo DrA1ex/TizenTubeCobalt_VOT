@@ -305,3 +305,20 @@ test('failed interim audio does not cancel the requested lively voice', async ()
     h.requests[0].resolve({ name: 'lively' }); await flush();
     assert.equal(h.flow.audible.provider, 'lively');
 });
+
+test('choosing a concrete YouTube track updates the session language without changing saved preferences', async () => {
+    const h = harness();
+    h.inventory.tracks.push({ id: 'en.2', language: 'en' });
+    await h.flow.select({ provider: 'youtube', trackId: 'en.2' });
+    assert.equal(h.flow.target, 'en');
+    assert.equal(h.prefs.target, 'ru');
+    assert.equal(h.flow.audible.trackId, 'en.2');
+});
+test('an original-audio default works even when the source language is unknown', async () => {
+    const h = harness({ auto: true, provider: 'original' });
+    h.inventory.originalLanguage = '';
+    await h.flow.tick();
+    assert.equal(h.flow.audible.provider, 'original');
+    assert.equal(h.requests.length, 0);
+    assert.equal(h.detections.length, 0);
+});

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Adds a compact audio button beside the player speed button; moves language, translation, volume, and account preferences into TizenTube settings. Track/language choices remain per video unless explicitly saved as defaults.
+- Refreshes audio and provider checks immediately and shows the actual accelerated playback speed.
+- Recovers from sustained decoder frame loss, a frozen picture, or stalled playback using measured telemetry. Auto reacts sooner; fixed quality gets a trial of up to about 4.5 seconds before the first downgrade request.
+- Returns speed to 1× when a previously failing high quality is selected again, including reselecting the configured quality.
+- Removes repeated player-constructor AST parsing and applies an available configured quality before playback starts.
+- Handles null and empty JSON responses and applies batched custom settings once.
+
 - Ignores brief buffered `waiting` events during accelerated playback when video time and frames continue advancing. This prevents false rebuffer reports from repeatedly lowering the player's performance cap and interrupting the picture for unnecessary quality switches.
 - Keeps a configured quality for the current video when the player briefly hides its video ID or reports an incomplete format list.
 - Restores quality preferences left by earlier temporary limits once, without overriding a newer manual selection.

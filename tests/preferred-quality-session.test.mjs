@@ -62,3 +62,13 @@ test('changing the setting to Auto releases the fixed range once', () => {
     session.apply(player, 'auto', { configChanged: true });
     assert.deepEqual(state.calls, [['hd2160', 'hd2160'], ['auto', 'auto']]);
 });
+
+test('complete startup metadata applies quality before first playback without a later decoder restart', () => {
+    const { state, player, session } = fixture();
+    state.playing = false;
+    assert.equal(session.apply(player, '2160p'), false);
+    assert.equal(session.apply(player, '2160p', { starting: true }), true);
+    state.playing = true;
+    assert.equal(session.apply(player, '2160p'), true);
+    assert.deepEqual(state.calls, [['hd2160', 'hd2160']]);
+});

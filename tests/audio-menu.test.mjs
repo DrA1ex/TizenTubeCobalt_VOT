@@ -29,21 +29,22 @@ test('observed speaker-icon Audio and custom Audio entries collapse to one, idem
 });
 
 async function menuHarness() {
-    const config = { audioVisibleLanguages: ['ru', 'en'], votTranslationVolume: '1', votOriginalVolume: '0.2' };
+    const config = { audioPreferredProvider: 'lively', audioAutoStart: false, audioTargetLanguage: 'ru', audioVisibleLanguages: ['ru', 'en'], votTranslationVolume: '1', votOriginalVolume: '0.2' };
     let id = 'ted', last, selected;
+    const state = { status: 'waiting', target: 'ru' };
     const ctx = vm.createContext({ console });
     const modules = {};
     const values = {
-        '../config.js': { configRead: key => config[key] },
+        '../config.js': { configRead: key => config[key], configWrite: (key, value) => { config[key] = value; } },
         '../features/audioLocale.js': { audioText },
         '../features/audioTracks.js': { ...tracks, audioInventory: () => ({ tracks: [], originalLanguage: '' }) },
         '../features/audioFlow.js': { audioFlow: {
-            snapshot: () => ({ status: 'waiting', target: 'ru' }), select: async choice => { selected = choice; },
+            snapshot: () => state, select: async choice => { selected = choice; state.requested = choice; },
             cancelWaiting() {}, applyReady() {}, setTarget() {}
         }, rememberAudioLogin() {} },
         '../features/vot.js': { getCurrentVideoId: () => id, getVotState: () => ({ hasOAuthToken: false }),
             loginYandex() {}, setOAuthToken() {}, clearOAuthToken() {}, refreshVotAuthorization() {} },
-        './ytUI.js': { showModal: (header, content, uniqueId) => { last = { header, items: content.items, uniqueId }; },
+        './ytUI.js': { showModal: (header, content, uniqueId, update) => { last = { header, items: content.items, uniqueId, update }; },
             buttonItem: (title, icon, commands) => ({ title, icon, commands }),
             overlayPanelItemListRenderer: items => ({ items }), showToast() {} },
         './settings.js': { optionShow: options => { last = options; } },
@@ -61,7 +62,7 @@ async function menuHarness() {
         modules[name] = module; await module.link(load); return module;
     };
     const main = await load('./audioMenu.js'); await main.evaluate();
-    return { api: main.namespace, get last() { return last; }, get selected() { return selected; },
+    return { api: main.namespace, get last() { return last; }, get selected() { return selected; }, config, state,
         home: () => { id = null; }, preferences: modules['./votSettings.js'].namespace };
 }
 test('real audio menu sections are short; absent YouTube tracks are not offered as ready choices', async () => {
@@ -78,19 +79,46 @@ test('real audio menu sections are short; absent YouTube tracks are not offered 
 });
 test('home menu contains preferences not unusable current-video choices', async () => {
     const h = await menuHarness(); h.home(); h.api.showAudioMenu();
-    assert.equal(h.last.items.length, 3);
+    assert.equal(h.last.items.length, 0);
     assert.ok(h.last.items.every(item => !item.title.title.includes('this video')));
     const prefs = h.preferences.votSettings();
-    assert.equal(prefs.options.length, 4);
+    assert.equal(prefs.options.length, 5);
     assert.ok(prefs.options.every(group => group.options.length <= 5));
     const automatic = prefs.options.find(group => group.menuId === 'tt-audio-automatic');
-    assert.equal(automatic.options.length, 4);
+    assert.equal(automatic.options.length, 5);
     assert.ok(automatic.options.some(option => option.value === 'audioDetectUnknownLanguage'));
     assert.ok(automatic.options.some(option => option.value === 'audioAutoUnknownLanguage'));
     assert.ok(automatic.options.every(option => option.name.length <= 24));
-    assert.ok(automatic.options.every(option => option.subtitle.length <= 40));
+    assert.ok(automatic.options.every(option => !option.subtitle || option.subtitle.length <= 40));
     const provider = prefs.options.find(group => group.menuId === 'tt-audio-audioPreferredProvider');
     assert.equal(provider.name, 'Translation provider');
-    assert.equal(provider.options.length, 3);
+    assert.equal(provider.options.length, 4);
     assert.equal(h.preferences.audioVolumeSettings().options.length, 2);
+});
+
+test('choosing Yandex immediately replaces the open menu and moves the check', async () => {
+    const h = await menuHarness();
+    await h.api.audioMenuAction('AUDIO_CHOOSE', { provider: 'standard' });
+    assert.equal(h.last.uniqueId, 'tt-audio-tracks');
+    assert.equal(h.last.update, 'replace');
+    assert.ok(h.last.items.find(row => row.title.title.includes('standard')).title.title.startsWith('✓ '));
+    await h.api.audioMenuAction('AUDIO_CHOOSE', { provider: 'lively' });
+    assert.ok(!h.last.items.find(row => row.title.title.includes('standard')).title.title.startsWith('✓ '));
+    assert.equal(h.last.items.filter(row => row.title.title.startsWith('✓ ')).length, 1);
+});
+test('quick menu offers session choice and only explicitly saving changes defaults', async () => {
+    const h = await menuHarness();
+    await h.api.audioMenuAction('AUDIO_CHOOSE', { provider: 'standard' });
+    assert.equal(h.config.audioPreferredProvider, 'lively');
+    h.api.showAudioMenu();
+    assert.ok(!h.last.items.some(row => ['AUDIO_PREFERENCES', 'AUDIO_VOLUMES', 'AUDIO_LOGIN'].includes(row.commands[0].customAction.action)));
+    await h.api.audioMenuAction('AUDIO_SAVE_DEFAULT');
+    assert.equal(h.config.audioPreferredProvider, 'standard');
+    assert.equal(h.config.audioTargetLanguage, 'ru');
+    assert.equal(h.config.audioAutoStart, true);
+});
+test('native audio entries can be removed without inserting a second settings entry', () => {
+    const original = [{ compactLinkRenderer: { icon: { iconType: 'AUDIO_TRACK' } } },
+        { compactLinkRenderer: { title: { simpleText: 'Quality' } } }];
+    assert.deepEqual(unifyPlayerAudioEntry(original), [original[1]]);
 });
