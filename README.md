@@ -2,7 +2,7 @@
 
 This project builds a RockTek GX1 Android TV APK by combining an official Cobalt Android APK with a TizenTube userscript and a native VOT audio bridge. The TizenTube source is developed in [our TizenTube fork](https://github.com/DrA1ex/TizenTube) and pinned here as a Git submodule. Cobalt is consumed as a verified prebuilt APK; its source tree is not part of this build.
 
-The current v8.9 release includes Cobalt 27.lts.3 Android APKs for `armeabi-v7a`, `arm64-v8a`, and `x86`. Playback quality adapts to sustained stalls during accelerated playback and starts fresh when the next video begins. See [changes](CHANGELOG.md), [Android installation](INSTALL-ANDROID.md), and the [build instructions](BUILDING.md).
+The current v9.0 release includes Cobalt 27.lts.3 Android APKs for `armeabi-v7a`, `arm64-v8a`, and `x86`. Each video starts at the best quality the device can decode at the selected speed, and quality no longer drops during smooth playback. See [changes](CHANGELOG.md), [Android installation](INSTALL-ANDROID.md), and the [build instructions](BUILDING.md).
 
 ## Build
 

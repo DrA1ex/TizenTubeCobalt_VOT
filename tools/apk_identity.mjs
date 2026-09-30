@@ -1,7 +1,7 @@
 export const COBALT_27_PACKAGE = 'dev.cobalt.coat';
 export const TIZENTUBE_PACKAGE = 'io.gh.reisxd.tizentube.cobalt';
-export const TIZENTUBE_VERSION_CODE = '210';
-export const TIZENTUBE_VERSION_NAME = '2.0.10-cobalt27.3';
+export const TIZENTUBE_VERSION_CODE = '211';
+export const TIZENTUBE_VERSION_NAME = '2.0.11-cobalt27.3';
 
 const EXTRA_PERMISSIONS = [
     'android.permission.REQUEST_INSTALL_PACKAGES',

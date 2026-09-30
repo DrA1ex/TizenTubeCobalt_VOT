@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v9.0 — stable quality at any speed
 
 - Adds a compact audio button beside the player speed button; moves language, translation, volume, and account preferences into TizenTube settings. Track/language choices remain per video unless explicitly saved as defaults.
 - Refreshes audio and provider checks immediately and shows the actual accelerated playback speed.
@@ -11,9 +11,9 @@
 - Keeps translated speech closer to the video by compensating command delay and correcting small drift without audible seeks.
 - Removes repeated player-constructor AST parsing.
 - Handles null and empty JSON responses and applies batched custom settings once.
-
 - Ignores brief buffered `waiting` events during accelerated playback when video time and frames continue advancing. This prevents false rebuffer reports from repeatedly lowering the player's performance cap.
 - Waits for a complete format list before applying a configured quality, and removes quality limits left by earlier builds.
+- Includes Cobalt 27.lts.3 Android packages for `armeabi-v7a`, `arm64-v8a`, and `x86`.
 
 ## v8.9 — smoother accelerated playback
 
