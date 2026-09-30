@@ -38,7 +38,7 @@ bash tools/build_all_native_vot_apks_macos.sh
 
 All referenced local files must exist before the build. The builder verifies the base APK SHA-256, identity, and structure before modifying it.
 
-Each build runs JavaScript and Java tests, builds the userscript with Rollup, compiles the native bridge into a separate DEX, decodes the Cobalt APK, adjusts its manifest, startup hook, and video buffer cap, embeds the JavaScript and bridge, rebuilds and signs the APK, and verifies alignment, ZIP integrity, embedded assets, and startup links in the signed DEX. It prints the resulting SHA-256. It does not install the APK on a device.
+Each build runs JavaScript and Java tests, builds the userscript with Rollup, compiles the native bridge into a separate DEX, decodes the Cobalt APK, adjusts its manifest, startup hook, and video buffer cap, embeds the JavaScript and bridge, rebuilds and signs the APK, and verifies alignment, ZIP integrity, embedded assets, and startup links in the signed DEX. It prints the resulting SHA-256. It does not install the APK on a device. The decoded working directory under `build/vot-release.*` is deleted when the script exits, whether it succeeds or fails; set `VOT_KEEP_BUILD=1` to keep it for debugging. Directories left by interrupted builds are removed at the next start once they are an hour old. The downloaded Cobalt inputs and apktool in `build/` are kept, because the upstream artifacts expire.
 
 For a faster JavaScript-only check after dependency installation:
 

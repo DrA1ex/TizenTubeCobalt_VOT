@@ -47,8 +47,19 @@ fi
 npm --prefix "$MODS_DIR" ci --legacy-peer-deps
 
 mkdir -p "$PROJECT_DIR/build"
+# Each build decodes a Cobalt APK (about 800 MB). Remove directories that
+# interrupted builds left behind; the age limit protects a concurrent build.
+find "$PROJECT_DIR/build" -maxdepth 1 -type d -name 'vot-release.*' -mmin +60 -exec rm -rf {} + 2>/dev/null || true
 BUILD_DIR="$(mktemp -d "$PROJECT_DIR/build/vot-release.XXXXXX")"
 echo "Build directory: $BUILD_DIR"
+cleanup_build() {
+    if [[ "${VOT_KEEP_BUILD:-0}" == "1" ]]; then
+        echo "Keeping build directory: $BUILD_DIR"
+    else
+        rm -rf "$BUILD_DIR"
+    fi
+}
+trap cleanup_build EXIT
 if [[ "${VOT_SKIP_TESTS:-0}" != "1" ]]; then
     node --experimental-vm-modules --test tests/*.test.mjs
 fi
