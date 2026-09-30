@@ -70,6 +70,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
     private boolean seekInFlight;
     private int requestedSeek;
     private float appliedRate = 1.0f;
+    private final AudioDrift drift = new AudioDrift();
     private MediaPlayer player;
     private volatile boolean prepared;
     private volatile boolean shouldPlay;
@@ -580,10 +581,14 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             if (session.equals(mediaSession) && "error".equals(state)) return;
 
             pendingPositionMs = Math.max(0, command.optInt("positionMs", 0));
-            pendingPositionAt = SystemClock.elapsedRealtime();
             pendingVolume = clamp01((float) command.optDouble("volume", 1));
             pendingRate = clampRate((float) command.optDouble("rate", 1));
             shouldPlay = !command.optBoolean("paused", true);
+            // The position was sampled when JS sent the command. The local HTTP
+            // hop and main-thread queue add delay, during which video advanced.
+            long now = System.currentTimeMillis();
+            long delay = Math.max(0, Math.min(1500, now - command.optLong("sentAt", now)));
+            pendingPositionAt = SystemClock.elapsedRealtime() - (shouldPlay ? delay : 0);
             if (!session.equals(mediaSession) || player == null) {
                 mediaSession = session;
                 startPlayer(command.getString("url"), pendingPositionMs, pendingVolume, pendingRate, !shouldPlay);
@@ -628,9 +633,8 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
         }
         if (!shouldPlay && player.isPlaying()) player.pause();
         if (seekInFlight) return;
-        // MediaPlayer position is coarse on this TV. A 250 ms threshold made
-        // normal jitter look like drift and could cause repeated asynchronous seeks.
-        if (Math.abs(player.getCurrentPosition() - desiredPosition) > 750) {
+        float speed = drift.speed(pendingRate, desiredPosition - player.getCurrentPosition());
+        if (Float.isNaN(speed)) {
             if (player.isPlaying()) player.pause();
             seekInFlight = true;
             requestedSeek = desiredPosition;
@@ -640,9 +644,9 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             return;
         }
         if (shouldPlay) {
-            if (Math.abs(appliedRate - pendingRate) > 0.001f) {
-                player.setPlaybackParams(player.getPlaybackParams().setSpeed(pendingRate));
-                appliedRate = pendingRate;
+            if (Math.abs(appliedRate - speed) > 0.001f) {
+                player.setPlaybackParams(player.getPlaybackParams().setSpeed(speed));
+                appliedRate = speed;
             }
             if (!player.isPlaying()) player.start();
             state = "playing";
@@ -722,6 +726,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
         shouldPlay = false;
         seekInFlight = false;
         appliedRate = 1.0f;
+        drift.reset();
         if (player != null) {
             try {
                 player.release();
@@ -753,6 +758,13 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             result.put("state", state);
             result.put("prepared", prepared);
             result.put("error", lastError);
+            MediaPlayer current = player;
+            if (prepared && current != null) {
+                // Diagnostics for synchronization checks over DevTools.
+                result.put("positionMs", current.getCurrentPosition());
+                result.put("desiredMs", desiredPositionMs());
+                result.put("speed", appliedRate);
+            }
             return result.toString();
         } catch (Exception error) {
             return "{\"ok\":false}";

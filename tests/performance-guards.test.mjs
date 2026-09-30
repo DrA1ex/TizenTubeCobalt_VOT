@@ -1,29 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
-import { determineQuality } from '../third_party/TizenTube/mods/features/preferredQualityPolicy.js';
 import { capVideoBufferBudget, GX1_MAX_VIDEO_BUFFER_MB } from '../tools/apk_performance.mjs';
 import { AUDIO_TRANSLATIONS } from '../third_party/TizenTube/mods/features/audioTranslations.js';
 import { isRussianAudioLocale } from '../third_party/TizenTube/mods/features/audioLocale.js';
 import { languageName } from '../third_party/TizenTube/mods/features/audioTracks.js';
 import { waitingIndicatorMessage } from '../third_party/TizenTube/mods/features/audioWaitingIndicator.js';
-
-const qualities = [
-    { qualityLabel: '2160p60 HDR', quality: 'hd2160' },
-    { qualityLabel: '1440p60', quality: 'hd1440' },
-    { qualityLabel: '1080p60', quality: 'hd1080' },
-    { qualityLabel: '720p', quality: 'hd720' },
-];
-
-test('preferred quality selects an exact resolution regardless of FPS suffix', () => {
-    assert.equal(determineQuality('2160p', qualities), 'hd2160');
-});
-
-test('missing preferred quality falls down instead of forcing highres', () => {
-    assert.equal(determineQuality('1800p', qualities), 'hd1440');
-    assert.equal(determineQuality('480p', qualities), 'hd720');
-    assert.equal(determineQuality('2160p', []), null);
-});
 
 test('GX1 APK caps Cobalt encoded-video memory budget', () => {
     const input = '<resources><integer name="max_video_buffer_budget">0</integer></resources>';

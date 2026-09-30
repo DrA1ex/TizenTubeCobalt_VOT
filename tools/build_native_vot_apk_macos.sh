@@ -60,8 +60,9 @@ mkdir -p "$BUILD_DIR/classes" "$BUILD_DIR/dex"
     native_bridge/stubs/org/chromium/content/browser/*.java \
     native_bridge/src/io/gh/reisxd/tizentube/vot/*.java
 if [[ "${VOT_SKIP_TESTS:-0}" != "1" ]]; then
-    "$JAVA_HOME/bin/javac" --release 8 -classpath "$BUILD_DIR/classes" -d "$BUILD_DIR/classes" tests/PlaybackOrderTest.java tests/OAuthCallbackTest.java tests/NativeStringsTest.java
+    "$JAVA_HOME/bin/javac" --release 8 -classpath "$BUILD_DIR/classes" -d "$BUILD_DIR/classes" tests/PlaybackOrderTest.java tests/AudioDriftTest.java tests/OAuthCallbackTest.java tests/NativeStringsTest.java
     "$JAVA_HOME/bin/java" -cp "$BUILD_DIR/classes" PlaybackOrderTest
+    "$JAVA_HOME/bin/java" -cp "$BUILD_DIR/classes" AudioDriftTest
     "$JAVA_HOME/bin/java" -cp "$BUILD_DIR/classes" OAuthCallbackTest
     "$JAVA_HOME/bin/java" -cp "$BUILD_DIR/classes" NativeStringsTest
 fi

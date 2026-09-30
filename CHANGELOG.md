@@ -4,14 +4,16 @@
 
 - Adds a compact audio button beside the player speed button; moves language, translation, volume, and account preferences into TizenTube settings. Track/language choices remain per video unless explicitly saved as defaults.
 - Refreshes audio and provider checks immediately and shows the actual accelerated playback speed.
-- Recovers from sustained decoder frame loss, a frozen picture, or stalled playback using measured telemetry. Auto reacts sooner; fixed quality gets a trial of up to about 4.5 seconds before the first downgrade request.
-- Returns speed to 1× when a previously failing high quality is selected again, including reselecting the configured quality.
-- Removes repeated player-constructor AST parsing and applies an available configured quality before playback starts.
+- Chooses the best quality the decoder can play at the current speed before each video starts, so accelerated 4K60 no longer freezes and videos no longer load twice at startup. For example, a 4K60 video at 1.5× or 2× starts directly in 1440p60 on GX1.
+- Stops lowering quality during smooth playback. Quality changes only for a new video, a speed change, or an explicit choice.
+- Returns speed to 1× when the stock quality menu selects a quality the decoder cannot show at the current speed.
+- Keeps higher H.264 levels when the preferred VP9 codec is only available at lower resolutions.
+- Keeps translated speech closer to the video by compensating command delay and correcting small drift without audible seeks.
+- Removes repeated player-constructor AST parsing.
 - Handles null and empty JSON responses and applies batched custom settings once.
 
-- Ignores brief buffered `waiting` events during accelerated playback when video time and frames continue advancing. This prevents false rebuffer reports from repeatedly lowering the player's performance cap and interrupting the picture for unnecessary quality switches.
-- Keeps a configured quality for the current video when the player briefly hides its video ID or reports an incomplete format list.
-- Restores quality preferences left by earlier temporary limits once, without overriding a newer manual selection.
+- Ignores brief buffered `waiting` events during accelerated playback when video time and frames continue advancing. This prevents false rebuffer reports from repeatedly lowering the player's performance cap.
+- Waits for a complete format list before applying a configured quality, and removes quality limits left by earlier builds.
 
 ## v8.9 — smoother accelerated playback
 

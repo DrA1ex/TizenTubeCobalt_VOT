@@ -8,24 +8,34 @@ Automatic selection, provider preference, visible YouTube languages, waiting beh
 
 Audio checks follow the requested track, including a translation that is still preparing. Updating an audio popup replaces its active renderer while retaining the parent popup. This avoids clients that keep old checks during an in-place update.
 
-## Recovery policy
+## Quality selection
 
-The Cobalt media speed remains separate from YouTube's internal API rate to avoid the player's blanket HFR cap. The public speed getter and menu captions show the actual media speed. The original getter is retained for internal rate resets, so a UI refresh cannot repeatedly reset accelerated playback.
+The Cobalt media speed remains separate from YouTube's internal API rate. With an internal rate above 1, the TV player caps every accelerated high-frame-rate video at 1080p and resets speed to 1× when a higher quality is chosen. The public speed getter and menu captions show the actual media speed; the original getter is retained for internal rate resets.
 
-The guard samples every 500 ms. It uses current quality, media time, buffered data, and frame counters. It does not assume a particular device, resolution, frame rate, or playback speed limit. Frame totals and dropped frames follow the [Media Playback Quality specification](https://w3c.github.io/media-playback-quality/); displayed frames are total minus dropped frames. WebKit counters provide a compatibility fallback.
+Quality is chosen before each video loads rather than lowered after playback problems:
 
-- Auto reacts to a buffered clock/picture freeze after about 2 seconds, or sustained poor progress/frame loss after about 2 seconds.
-- Fixed quality gives sustained frame loss about 4 seconds and a frozen picture/clock about 4.5 seconds. A fixed stream with an empty buffer also gets a bounded recovery attempt.
-- Frame loss must reach 20% over consecutive sampling windows; a brief burst does not lower quality. Clock progress must fall below 55% of the requested rate to count as sustained slow playback.
-- Recovery lowers one available resolution at a time. Auto first sets an upper bound; if the actual stream does not change within 2 seconds, it pins that resolution once. An ignored pin leads to a further step down. Fixed quality pins the lower resolution immediately.
-- Pauses, seeks, hidden pages, changed videos, replaced media elements, and reset counters discard old samples. A delayed JS callback can preserve evidence of frozen frames while the media clock continues normally.
-- Choosing a previously failing resolution manually returns speed to 1× before applying that quality. This covers both the stock quality API and TizenTube's configured-quality menu, including reselecting the same configured value.
-- Reducing speed releases the temporary cap for a fresh trial. Navigation releases the previous video's cap before the next loader starts; stored temporary caps also have a startup restoration path.
+- The target is the configured maximum (or Auto), limited to the highest level that the platform decoder can decode at the current speed. A level qualifies when each of its formats that plays at 1× also passes `MediaSource.isTypeSupported` with its width, height, and `framerate` set to the format's frame rate multiplied by the speed.
+- YouTube reads a sticky maximum (`yt-player-quality`) when the next video's loader starts. The controller writes it while the player response is parsed, so the first stream already has the target quality. At startup it removes temporary caps left by older builds.
+- A fixed preference is locked to the target once the video's metadata is available. When the stream already matches, this call does not restart it. Auto remains adaptive: the target is only an upper bound, and a stream is replaced only when it exceeds the decoder limit.
+- Every range change restarts the TV player's media source (about 2–3 seconds without a picture on GX1), so quality changes only for a new video, a speed change in either direction, or a changed setting.
+- A choice in the stock quality menu is kept for the current video. If the decoder cannot show it at the current speed, speed returns to 1×.
+- The preferred codec filter keeps other codecs for levels above the preferred codec's maximum, so a video with VP9 only up to 240p can still use a higher H.264 level.
 
-The configured quality is applied at `loadedmetadata` when available, rather than waiting for the first playing state and then restarting the decoder. Player UI patch discovery and AST parsing happen once when the patch installs. They no longer wait for a video element or run inside every player constructor.
+### Why not playback telemetry
+
+Earlier builds lowered quality from frame counters, the media clock, and buffered ranges. On GX1 this was unreliable in both directions:
+
+- Cobalt updates `getVideoPlaybackQuality()` counters in bursts about every 1.5–2.5 seconds. The frozen-picture rule therefore fired during smooth playback, even at 1×, and stepped 720p down to 240p within about 30 seconds.
+- When the decoder cannot keep up (4K60 at 1.5× or 2×), audio and `currentTime` continue normally, frame counters show no drops, and Starboard logs video frames lagging 5, 10, then 15 seconds behind media time. Only the video layer shows the freeze.
+
+Measured on GX1 (RTD1325, VP9): `isTypeSupported` accepts 2160p up to 60 fps, 1440p up to 150 fps, and 1080p up to 240 fps. SurfaceFlinger presentation matched these limits: 4K60 froze at 1.5× and 2×, while 1440p60 at 2× and 1080p60 at 2× were presented at the 60 Hz display rate without lag warnings.
+
+## Translation synchronization
+
+Native translated speech follows the video clock. The bridge compensates the local command delay using the command's send time. Drift from 100 ms to 1 second is corrected by playing 4% (above 500 ms, 8%) faster or slower until it is below 50 ms; only larger jumps seek. With these rules, measured drift on GX1 stayed within about ±55 ms at 1.25× and 1.5×. The native status response includes position diagnostics for such checks.
 
 ## Verification and limits
 
-The automated suite covers healthy accelerated playback, buffered picture freezes with advancing audio time, sustained dropped frames, slow/stopped clocks, network starvation, ignored quality switches, transient drops, pause/seek/counter resets, manual quality reselection, navigation, and menu commands. The APK builder additionally compiles and tests the Java bridge and verifies signing, alignment, embedded assets, and DEX startup links for `armeabi-v7a`, `arm64-v8a`, and `x86`.
+The automated suite covers decoder ceilings for 30 and 60 fps content at several speeds, codec fallback, sticky storage, single-load startup, speed changes in both directions, Auto bounds, new videos, setting changes, stock menu choices, and incomplete quality lists. The APK builder additionally tests the Java drift policy and verifies signing, alignment, embedded assets, and DEX startup links for `armeabi-v7a`, `arm64-v8a`, and `x86`.
 
-These checks do not measure startup latency or decoding on a physical TV. Recovery requires a coherent current-quality list and usable telemetry. Without frame counters, an independently frozen picture with an advancing media clock cannot be distinguished reliably from healthy playback; clock and buffer recovery remain available. At the lowest available resolution there is no further quality step. The 4.5-second fixed-quality threshold describes detection and the first recovery request, not a guarantee that a device finishes its decoder switch within that time.
+The GX1 measurements above used the `armeabi-v7a` build. Network capacity is left to YouTube: a fixed quality does not step down when the connection is too slow, while Auto does. Devices whose `isTypeSupported` ignores `framerate` get no speed limit from this policy. On the tested network, an unreachable `googlevideo.com` cache host delayed many video starts by about 5.5 seconds before the player fell back to another host; that delay is outside the app.
