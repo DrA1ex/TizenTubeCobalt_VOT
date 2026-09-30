@@ -137,6 +137,24 @@ test('playback settings show the configured speed and remove the stock audio men
     assert.equal(list.items.filter(item => ['AUDIO_TRACK', 'VOLUME_UP'].includes(item.compactLinkRenderer.icon?.iconType)).length, 0);
 });
 
+test('the speed entry is replaced under either icon name used by TV client versions', async () => {
+    for (const icon of ['SLOW_MOTION_VIDEO', 'SPEEDOMETER']) {
+        const h = await commandsHarness();
+        h.config.videoSpeed = 1.5;
+        const item = { compactLinkRenderer: { icon: { iconType: icon }, subtitle: { simpleText: 'Обычная' },
+            serviceEndpoint: { openClientOverlayAction: { type: 'CLIENT_OVERLAY_TYPE_PLAYBACK_SPEED' } } } };
+        const list = { items: [item] };
+        h.resolve({ openPopupAction: { uniqueId: 'playback-settings', popup: {
+            overlaySectionRenderer: { overlay: { overlayTwoPanelRenderer: {
+                actionPanel: { overlayPanelRenderer: { content: { overlayPanelItemListRenderer: list } } }
+            } } }
+        } } });
+        assert.equal(item.compactLinkRenderer.subtitle.simpleText, '1.5x', icon);
+        assert.equal(item.compactLinkRenderer.serviceEndpoint.signalAction.customAction.action,
+            'TT_SPEED_SETTINGS_SHOW', icon);
+    }
+});
+
 test('guide JSON hook preserves null, empty lists and new renderer types without adding an audio shortcut', async () => {
     const config = { sidebarContentsOrder: ['home'], disabledSidebarContents: [] };
     const context = vm.createContext({ console });

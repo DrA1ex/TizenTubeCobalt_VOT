@@ -5,6 +5,10 @@
 - Adds a compact audio button beside the player speed button; moves language, translation, volume, and account preferences into TizenTube settings. Track/language choices remain per video unless explicitly saved as defaults.
 - Refreshes audio and provider checks immediately and shows the actual accelerated playback speed.
 - Chooses the best quality the decoder can play at the current speed before each video starts, so accelerated 4K60 no longer freezes and videos no longer load twice at startup. For example, a 4K60 video at 1.5× or 2× starts directly in 1440p60 on GX1.
+- Starts videos in 1.4–3.6 seconds instead of 7–9 on a network where a YouTube cache node does not answer: unreachable nodes are remembered for an hour and skipped, and a fixed quality is reached during playback without a second black screen.
+- Fixes the playback speed entry in the gear menu, which used the stock menu and ignored the selection.
+- Adds an icon to the audio and translation button.
+- Queues quality changes so rapid speed changes cannot overlap a stream that is still loading, and forgets a quality chosen in the stock menu when another video opens.
 - Stops lowering quality during smooth playback. Quality changes only for a new video, a speed change, or an explicit choice.
 - Returns speed to 1× when the stock quality menu selects a quality the decoder cannot show at the current speed.
 - Keeps higher H.264 levels when the preferred VP9 codec is only available at lower resolutions.

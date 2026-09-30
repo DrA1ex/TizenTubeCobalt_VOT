@@ -93,7 +93,8 @@ test('decoder answers are cached and exceptions count as unsupported', () => {
 
 function harness({ preference = '2160p', speed = 1 } = {}) {
     const h = { preference, speed, calls: [], resets: [], listeners: {}, store: new Map(),
-        id: null, response: null, playing: null, preferred: 'auto' };
+        id: null, response: null, playing: null, preferred: 'auto', time: 1e6,
+        wait(ms = 4000) { h.time += ms; } };
     h.store.set('tt-acceleration-quality-restore', '{"preferred":"auto","cap":"large"}');
     h.store.set('yt-player-quality', stickyQualityEntry(480));
     h.video = {};
@@ -123,9 +124,10 @@ function harness({ preference = '2160p', speed = 1 } = {}) {
         addEventListener: (type, fn) => { h.listeners[type] = fn; }, removeEventListener() {}
     };
     h.controller = installQualityController({ documentRef, windowRef, jsonTarget: h.json,
-        readPreference: () => h.preference, readSpeed: () => h.speed, resetSpeed: value => { h.resets.push(value); h.speed = value; } });
+        now: () => h.time, readPreference: () => h.preference, readSpeed: () => h.speed, resetSpeed: value => { h.resets.push(value); h.speed = value; } });
     h.sticky = () => stickyQualityLevel(h.store.get('yt-player-quality'));
     h.load = (id, fps, playing) => {
+        h.wait();
         h.response = h.json.parse(JSON.stringify(response(id, fps)));
         h.id = id;
         h.playing = playing;
@@ -166,10 +168,13 @@ test('a video that already starts at the target is locked without a second load'
 test('speed changes switch quality once in each direction', () => {
     const h = harness({ speed: 1 });
     h.load('a', 60, 'hd2160');
+    h.wait();
     h.speed = 2;
     h.controller.onSpeedChange();
+    h.wait();
     h.speed = 2.25;
     h.controller.onSpeedChange();
+    h.wait();
     h.speed = 1;
     h.controller.onSpeedChange();
     assert.deepEqual(h.calls, [['hd2160', 'hd2160'], ['hd1440', 'hd1440'], ['hd2160', 'hd2160']]);
@@ -182,9 +187,11 @@ test('Auto keeps adaptive selection and only bounds or forces an undecodable str
     h.speed = 2;
     h.controller.onSpeedChange();
     assert.deepEqual(h.calls, [['tiny', 'hd1440']], 'a lower adaptive stream needs no restart');
+    h.wait();
     h.speed = 1;
     h.controller.onSpeedChange();
     assert.deepEqual(h.calls.at(-1), ['auto', 'auto']);
+    h.wait();
     h.playing = 'hd2160';
     h.speed = 1.5;
     h.controller.onSpeedChange();
@@ -201,8 +208,10 @@ test('a new video starts from its own formats, not the previous limit', () => {
 test('changing the setting applies immediately, including Auto', () => {
     const h = harness({ speed: 1 });
     h.load('a', 60, 'hd2160');
+    h.wait();
     h.preference = '1080p';
     h.controller.onPreferenceChange();
+    h.wait();
     h.preference = 'auto';
     h.controller.onPreferenceChange();
     assert.deepEqual(h.calls, [['hd2160', 'hd2160'], ['hd1080', 'hd1080'], ['auto', 'auto']]);
@@ -211,6 +220,7 @@ test('changing the setting applies immediately, including Auto', () => {
 test('a stock menu choice is kept for the video and returns speed to 1x when undecodable', () => {
     const h = harness({ speed: 2 });
     h.load('a', 60, 'hd1440');
+    h.wait();
     h.controller.checkUserChoice();
     h.preferred = 'hd2160';
     h.controller.checkUserChoice();
@@ -220,6 +230,7 @@ test('a stock menu choice is kept for the video and returns speed to 1x when und
     assert.equal(h.calls.length, calls, 'the stock menu already applied its choice');
     h.preferred = 'hd720';
     h.controller.checkUserChoice();
+    h.wait();
     h.speed = 2;
     h.controller.onSpeedChange();
     assert.equal(h.calls.length, calls, 'the 720p choice is below the speed limit and stays');
@@ -242,5 +253,76 @@ test('incomplete quality lists and mismatched responses wait for a later event',
     h.player.getAvailableQualityData = full;
     h.playing = 'hd2160';
     h.listeners.playing({ target: h.video });
+    assert.deepEqual(h.calls, [['hd2160', 'hd2160']]);
+});
+
+test('a change requested while another is loading is applied afterwards, newest wish first', () => {
+    const h = harness({ speed: 1 });
+    h.load('a', 60, 'hd2160');
+    h.speed = 2;
+    h.controller.onSpeedChange();
+    h.speed = 3;
+    h.controller.onSpeedChange();
+    assert.equal(h.calls.length, 1, 'no change while the first is still loading');
+    h.wait(1000);
+    h.controller.enforce();
+    assert.equal(h.calls.length, 1);
+    h.wait(3000);
+    h.controller.enforce();
+    assert.deepEqual(h.calls.at(-1), ['hd1080', 'hd1080'], 'only the latest speed is applied');
+    assert.equal(h.calls.length, 2);
+});
+
+test('playing ends the settling period early, but not for a start event', () => {
+    const h = harness({ speed: 1 });
+    h.load('a', 60, 'hd2160');
+    h.speed = 2;
+    h.wait(500);
+    h.listeners.playing({ type: 'playing', target: h.video });
+    assert.equal(h.calls.length, 1, 'too early to be the end of the change');
+    h.wait(1000);
+    h.listeners.playing({ type: 'playing', target: h.video });
+    assert.deepEqual(h.calls.at(-1), ['hd1440', 'hd1440']);
+});
+
+test('a choice made in the stock menu is forgotten when another video is opened', () => {
+    const h = harness({ speed: 1 });
+    h.load('a', 60, 'hd2160');
+    h.wait();
+    h.controller.checkUserChoice();
+    h.preferred = 'hd720';
+    h.controller.checkUserChoice();
+    h.load('b', 60, 'hd1440');
+    assert.deepEqual(h.calls.at(-1), ['hd2160', 'hd2160']);
+    h.load('a', 60, 'hd720');
+    assert.deepEqual(h.calls.at(-1), ['hd2160', 'hd2160'], 'the old choice must not return with the video');
+});
+
+test('the target is applied at the start of loading, before the first stream arrives', () => {
+    const h = harness({ speed: 1 });
+    h.wait();
+    h.response = h.json.parse(JSON.stringify(response('a', 60)));
+    h.id = 'a';
+    h.playing = 'unknown';
+    const full = h.player.getAvailableQualityData;
+    h.player.getAvailableQualityData = () => [];
+    h.listeners.play({ target: h.video });
+    assert.deepEqual(h.calls, [], 'the format list is not ready yet');
+    h.player.getAvailableQualityData = full;
+    h.listeners.waiting({ target: h.video });
+    assert.deepEqual(h.calls, [['hd2160', 'hd2160']]);
+    h.playing = 'hd2160';
+    h.listeners.loadedmetadata({ target: h.video });
+    assert.equal(h.calls.length, 1);
+});
+
+test('a failed range call is retried instead of being recorded as applied', () => {
+    const h = harness({ speed: 1 });
+    const original = h.player.setPlaybackQualityRange;
+    h.player.setPlaybackQualityRange = () => { throw Error('loader not ready'); };
+    h.load('a', 60, 'hd1440');
+    assert.deepEqual(h.calls, []);
+    h.player.setPlaybackQualityRange = original;
+    h.controller.enforce();
     assert.deepEqual(h.calls, [['hd2160', 'hd2160']]);
 });
