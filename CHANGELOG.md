@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## v9.1 — translation sync
 
 - Adds **Translation sync** to the audio menu: move the Yandex translation earlier or later in 0.1 s and 0.5 s steps (up to ±5 s). The setting is saved for all videos.
 - Translated speech no longer falls behind after a seek or after the translation stream rebuffers: it waits ahead of the video and starts exactly when the video reaches it.
+- Includes Cobalt 27.lts.3 Android packages for `armeabi-v7a`, `arm64-v8a`, and `x86`.
 
 ## v9.0 — stable quality at any speed
 
