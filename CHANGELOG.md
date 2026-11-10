@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Adds **Translation sync** to the audio menu: move the Yandex translation earlier or later in 0.1 s and 0.5 s steps (up to ±5 s). The setting is saved for all videos.
-- Translated speech no longer falls behind after a seek while it waits for the seek to finish.
+- Translated speech no longer falls behind after a seek or after the translation stream rebuffers: it waits ahead of the video and starts exactly when the video reaches it.
 
 ## v9.0 — stable quality at any speed
 

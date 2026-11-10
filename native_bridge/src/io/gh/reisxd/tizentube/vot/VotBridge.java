@@ -73,7 +73,15 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
     // User sync offset already folded into positionMs by JS; a change seeks at
     // once instead of waiting for the slow speed correction.
     private int appliedOffsetMs;
-    private boolean offsetSeekPending;
+    private boolean seekPending;
+    // Speech parked ahead of the video after a seek, started on the video clock.
+    private int heldStartMs = -1;
+    private int heldWindowMs;
+    private final Runnable heldStart = new Runnable() {
+        @Override public void run() {
+            if (current == VotBridge.this && heldStartMs >= 0) reconcilePlayer();
+        }
+    };
     private float appliedRate = 1.0f;
     private final AudioDrift drift = new AudioDrift();
     private MediaPlayer player;
@@ -592,7 +600,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             int offsetMs = command.optInt("offsetMs", 0);
             if (offsetMs != appliedOffsetMs) {
                 appliedOffsetMs = offsetMs;
-                offsetSeekPending = true;
+                seekPending = true;
             }
             // The position was sampled when JS sent the command. The local HTTP
             // hop and main-thread queue add delay, during which video advanced.
@@ -643,13 +651,35 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
         }
         if (!shouldPlay && player.isPlaying()) player.pause();
         if (seekInFlight) return;
+        if (heldStartMs >= 0) {
+            int wait = seekPending ? -1 : AudioDrift.startWait(heldStartMs, desiredPosition);
+            if (wait < 0 || wait > heldWindowMs) {
+                // The video passed the held position (a slow seek) or jumped away.
+                clearHeldStart();
+                seekPending = true;
+            } else if (!shouldPlay || wait > 15) {
+                // Paused video keeps the held position valid for its resume.
+                if (player.isPlaying()) player.pause();
+                mainHandler.removeCallbacks(heldStart);
+                if (shouldPlay) mainHandler.postDelayed(heldStart, Math.max(1, Math.round(wait / pendingRate)));
+                state = shouldPlay ? "loading" : "paused";
+                return;
+            } else {
+                clearHeldStart();
+                drift.reset();
+            }
+        }
         float speed = drift.speed(pendingRate, desiredPosition - player.getCurrentPosition());
-        if (Float.isNaN(speed) || offsetSeekPending) {
-            offsetSeekPending = false;
+        if (Float.isNaN(speed) || seekPending) {
+            seekPending = false;
             drift.reset();
             if (player.isPlaying()) player.pause();
             int target = drift.seekTarget(desiredPosition, shouldPlay);
             if (duration > 0) target = Math.min(target, duration - 1);
+            if (shouldPlay) {
+                heldStartMs = target;
+                heldWindowMs = Math.max(0, target - desiredPosition) + AudioDrift.LATE_MS;
+            }
             seekInFlight = true;
             requestedSeek = target;
             seekStartedAt = SystemClock.elapsedRealtime();
@@ -697,6 +727,8 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 try {
                 seekInFlight = false;
                 drift.seekCompleted(SystemClock.elapsedRealtime() - seekStartedAt, pendingRate);
+                // The landed position is exact; the requested one may be rounded.
+                if (heldStartMs >= 0) heldStartMs = mediaPlayer.getCurrentPosition();
                 // Re-read both position and pause state after an asynchronous seek.
                 // A second D-pad seek can supersede the first before this callback.
                 reconcilePlayer();
@@ -715,6 +747,20 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 if (!foreground || SystemClock.elapsedRealtime() - lastHeartbeat > 1200) shouldPlay = false;
                 reconcilePlayer();
                 Log.i(TAG, "Native VOT audio prepared");
+            }
+        });
+        created.setOnInfoListener(new MediaPlayer.OnInfoListener() {
+            @Override
+            public boolean onInfo(MediaPlayer mediaPlayer, int what, int extra) {
+                if (player != mediaPlayer || what != MediaPlayer.MEDIA_INFO_BUFFERING_END) return false;
+                // The stream resumed from where it stalled, behind the video.
+                // Resynchronize with a held seek rather than a slow catch-up.
+                if (prepared && shouldPlay && !seekInFlight && heldStartMs < 0
+                        && desiredPositionMs() - mediaPlayer.getCurrentPosition() > AudioDrift.LATE_MS) {
+                    seekPending = true;
+                    reconcilePlayer();
+                }
+                return false;
             }
         });
         created.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
@@ -741,6 +787,8 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
         prepared = false;
         shouldPlay = false;
         seekInFlight = false;
+        seekPending = false;
+        clearHeldStart();
         appliedRate = 1.0f;
         drift.reset();
         if (player != null) {
@@ -750,6 +798,11 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             }
             player = null;
         }
+    }
+
+    private void clearHeldStart() {
+        heldStartMs = -1;
+        mainHandler.removeCallbacks(heldStart);
     }
 
     private void shutdown() {
@@ -781,7 +834,8 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 result.put("desiredMs", desiredPositionMs());
                 result.put("speed", appliedRate);
                 result.put("offsetMs", appliedOffsetMs);
-                result.put("seekLeadMs", drift.seekLeadMs());
+                result.put("seekMarginMs", drift.seekMarginMs());
+                result.put("heldStartMs", heldStartMs);
             }
             return result.toString();
         } catch (Exception error) {
