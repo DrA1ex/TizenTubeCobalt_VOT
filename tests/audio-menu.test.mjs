@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { audioMenuPage } from '../third_party/TizenTube/mods/ui/audioMenuPaging.js';
 import { unifyPlayerAudioEntry } from '../third_party/TizenTube/mods/ui/playerAudioEntry.js';
 import * as tracks from '../third_party/TizenTube/mods/features/audioTracks.js';
+import * as votPlayback from '../third_party/TizenTube/mods/features/votPlayback.js';
 
 test('every paged language/volume item is reachable with at most five rows', () => {
     for (const count of [6, 11, 17, 25]) {
@@ -37,6 +38,7 @@ async function menuHarness() {
     const values = {
         '../config.js': { configRead: key => config[key], configWrite: (key, value) => { config[key] = value; } },
         '../features/audioLocale.js': { audioText },
+        '../features/votPlayback.js': { ...votPlayback },
         '../features/audioTracks.js': { ...tracks, audioInventory: () => ({ tracks: [], originalLanguage: '' }) },
         '../features/audioFlow.js': { audioFlow: {
             snapshot: () => state, select: async choice => { selected = choice; state.requested = choice; },
@@ -44,9 +46,9 @@ async function menuHarness() {
         }, rememberAudioLogin() {} },
         '../features/vot.js': { getCurrentVideoId: () => id, getVotState: () => ({ hasOAuthToken: false }),
             loginYandex() {}, setOAuthToken() {}, clearOAuthToken() {}, refreshVotAuthorization() {} },
-        './ytUI.js': { showModal: (header, content, uniqueId, update) => { last = { header, items: content.items, uniqueId, update }; },
+        './ytUI.js': { showModal: (header, content, uniqueId, update) => { last = { header, items: content.items, focus: content.selectedIndex, uniqueId, update }; },
             buttonItem: (title, icon, commands) => ({ title, icon, commands }),
-            overlayPanelItemListRenderer: items => ({ items }), showToast() {} },
+            overlayPanelItemListRenderer: (items, selectedIndex) => ({ items, selectedIndex }), showToast() {} },
         './settings.js': { optionShow: options => { last = options; } },
         './audioMenuPaging.js': { audioMenuPage }
     };
@@ -67,7 +69,7 @@ async function menuHarness() {
 }
 test('real audio menu sections are short; absent YouTube tracks are not offered as ready choices', async () => {
     const h = await menuHarness();
-    for (const section of ['main', 'tracks', 'youtube', 'waiting', 'language', 'account']) {
+    for (const section of ['main', 'tracks', 'youtube', 'waiting', 'language', 'account', 'sync']) {
         h.api.showAudioMenu(section);
         assert.ok(h.last.items.length <= 5, section);
     }
@@ -121,4 +123,33 @@ test('native audio entries can be removed without inserting a second settings en
     const original = [{ compactLinkRenderer: { icon: { iconType: 'AUDIO_TRACK' } } },
         { compactLinkRenderer: { title: { simpleText: 'Quality' } } }];
     assert.deepEqual(unifyPlayerAudioEntry(original), [original[1]]);
+});
+
+test('translation sync menu shifts the saved offset and keeps focus on the pressed row', async () => {
+    const h = await menuHarness();
+    h.config.votSyncOffsetMs = 0;
+    h.api.showAudioMenu();
+    const entry = h.last.items.find(row => row.commands[0].customAction.parameters?.section === 'sync');
+    assert.equal(entry.title.subtitle, 'No shift');
+    h.api.showAudioMenu('sync');
+    assert.equal(h.last.items.length, 5);
+    assert.equal(h.last.items[0].title.title, 'Translation earlier · +0.1 s');
+    assert.equal(h.last.items[2].title.title, 'Translation later · −0.1 s');
+    await h.api.audioMenuAction('AUDIO_SYNC', { delta: 500 });
+    await h.api.audioMenuAction('AUDIO_SYNC', { delta: 100 });
+    assert.equal(h.config.votSyncOffsetMs, 600);
+    assert.equal(h.last.focus, 0);
+    assert.equal(h.last.uniqueId, 'tt-audio-sync');
+    assert.equal(h.last.update, 'replace');
+    assert.equal(h.last.header.subtitle, '+0.6 s · Saved for all videos');
+    await h.api.audioMenuAction('AUDIO_SYNC', { delta: -500 });
+    await h.api.audioMenuAction('AUDIO_SYNC', { delta: -500 });
+    assert.equal(h.config.votSyncOffsetMs, -400);
+    assert.equal(h.last.focus, 3);
+    assert.equal(h.last.header.subtitle, '−0.4 s · Saved for all videos');
+    for (let i = 0; i < 20; i++) await h.api.audioMenuAction('AUDIO_SYNC', { delta: 500 });
+    assert.equal(h.config.votSyncOffsetMs, votPlayback.SYNC_OFFSET_LIMIT_MS);
+    await h.api.audioMenuAction('AUDIO_SYNC', { reset: true });
+    assert.equal(h.config.votSyncOffsetMs, 0);
+    assert.equal(h.last.focus, 4);
 });

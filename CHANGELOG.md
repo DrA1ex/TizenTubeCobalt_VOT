@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Adds **Translation sync** to the audio menu: move the Yandex translation earlier or later in 0.1 s and 0.5 s steps (up to ±5 s). The setting is saved for all videos.
+- Translated speech no longer falls behind after a seek while it waits for the seek to finish.
+
 ## v9.0 — stable quality at any speed
 
 - Adds a compact audio button beside the player speed button; moves language, translation, volume, and account preferences into TizenTube settings. Track/language choices remain per video unless explicitly saved as defaults.

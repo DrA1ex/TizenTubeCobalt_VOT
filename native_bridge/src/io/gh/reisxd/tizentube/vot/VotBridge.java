@@ -69,6 +69,11 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
     private String mediaSession = "";
     private boolean seekInFlight;
     private int requestedSeek;
+    private long seekStartedAt;
+    // User sync offset already folded into positionMs by JS; a change seeks at
+    // once instead of waiting for the slow speed correction.
+    private int appliedOffsetMs;
+    private boolean offsetSeekPending;
     private float appliedRate = 1.0f;
     private final AudioDrift drift = new AudioDrift();
     private MediaPlayer player;
@@ -584,6 +589,11 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             pendingVolume = clamp01((float) command.optDouble("volume", 1));
             pendingRate = clampRate((float) command.optDouble("rate", 1));
             shouldPlay = !command.optBoolean("paused", true);
+            int offsetMs = command.optInt("offsetMs", 0);
+            if (offsetMs != appliedOffsetMs) {
+                appliedOffsetMs = offsetMs;
+                offsetSeekPending = true;
+            }
             // The position was sampled when JS sent the command. The local HTTP
             // hop and main-thread queue add delay, during which video advanced.
             long now = System.currentTimeMillis();
@@ -634,13 +644,18 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
         if (!shouldPlay && player.isPlaying()) player.pause();
         if (seekInFlight) return;
         float speed = drift.speed(pendingRate, desiredPosition - player.getCurrentPosition());
-        if (Float.isNaN(speed)) {
+        if (Float.isNaN(speed) || offsetSeekPending) {
+            offsetSeekPending = false;
+            drift.reset();
             if (player.isPlaying()) player.pause();
+            int target = drift.seekTarget(desiredPosition, shouldPlay);
+            if (duration > 0) target = Math.min(target, duration - 1);
             seekInFlight = true;
-            requestedSeek = desiredPosition;
+            requestedSeek = target;
+            seekStartedAt = SystemClock.elapsedRealtime();
             if (android.os.Build.VERSION.SDK_INT >= 26) {
-                player.seekTo((long) desiredPosition, MediaPlayer.SEEK_CLOSEST);
-            } else player.seekTo(desiredPosition);
+                player.seekTo((long) target, MediaPlayer.SEEK_CLOSEST);
+            } else player.seekTo(target);
             return;
         }
         if (shouldPlay) {
@@ -681,6 +696,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 if (player != mediaPlayer) return;
                 try {
                 seekInFlight = false;
+                drift.seekCompleted(SystemClock.elapsedRealtime() - seekStartedAt, pendingRate);
                 // Re-read both position and pause state after an asynchronous seek.
                 // A second D-pad seek can supersede the first before this callback.
                 reconcilePlayer();
@@ -764,6 +780,8 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 result.put("positionMs", current.getCurrentPosition());
                 result.put("desiredMs", desiredPositionMs());
                 result.put("speed", appliedRate);
+                result.put("offsetMs", appliedOffsetMs);
+                result.put("seekLeadMs", drift.seekLeadMs());
             }
             return result.toString();
         } catch (Exception error) {

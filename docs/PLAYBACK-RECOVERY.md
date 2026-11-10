@@ -45,6 +45,11 @@ The stock playback-speed entry in the gear menu is found by either icon name the
 
 Native translated speech follows the video clock. The bridge compensates the local command delay using the command's send time. Drift from 100 ms to 1 second is corrected by playing 4% (above 500 ms, 8%) faster or slower until it is below 50 ms; only larger jumps seek. With these rules, measured drift on GX1 stayed within about ±55 ms at 1.25× and 1.5×. The native status response includes position diagnostics for such checks.
 
+That loop only sees positions that `MediaPlayer` reports. It cannot see output latency after the decoder (the audio pipeline, HDMI, or a sound bar), which is heard as a constant lag. The Yandex audio itself is aligned with the video: the files are constant-bitrate 128 kbit/s MP3 (22.05 kHz mono, with a LAME `Info` header, so seeks are exact), as long as the video, with phrases placed at the original speech times. Two corrections address what the loop cannot measure:
+
+- A seek takes time, during which the video advances; the speech used to land behind by the seek time and then caught up only at 4–8%. The bridge now learns the seek time (averaged, at most 800 ms) and seeks that far ahead while playing.
+- **Audio and translation → Translation sync** shifts the translation against the video in 0.1 s and 0.5 s steps, up to ±5 s. A positive value plays it earlier. The offset is saved for all videos and both Yandex voices, and a change seeks at once. With a negative offset, the translation waits at the start of the video until its shifted position is reached. The status response reports `offsetMs` and `seekLeadMs`.
+
 ## Verification and limits
 
 The automated suite covers decoder ceilings for 30 and 60 fps content at several speeds, codec fallback, sticky storage, single-load startup, speed changes in both directions, Auto bounds, new videos, setting changes, stock menu choices, and incomplete quality lists. The APK builder additionally tests the Java drift policy and verifies signing, alignment, embedded assets, and DEX startup links for `armeabi-v7a`, `arm64-v8a`, and `x86`.

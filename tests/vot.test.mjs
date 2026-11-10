@@ -3,7 +3,7 @@ import { audioText } from '../third_party/TizenTube/mods/features/audioLocale.js
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
-import { playbackSnapshot, sourceLanguage } from '../third_party/TizenTube/mods/features/votPlayback.js';
+import { playbackSnapshot, sourceLanguage, applySyncOffset, normalizeSyncOffset } from '../third_party/TizenTube/mods/features/votPlayback.js';
 
 const source = await readFile(new URL('../third_party/TizenTube/mods/features/vot.js', import.meta.url), 'utf8');
 const policy = await readFile(new URL('../third_party/TizenTube/mods/features/votPlayback.js', import.meta.url), 'utf8');
@@ -121,6 +121,28 @@ test('pause stays paused after periodic sync; seek while paused cannot resume', 
     const syncs = h.commands.filter(c => c.action === 'sync');
     assert.equal(syncs.at(-1).paused, true); assert.equal(syncs.at(-1).positionMs, 200000);
     assert.ok(syncs.every((c, i) => i === 0 || c.seq > syncs[i - 1].seq));
+});
+test('sync offset shifts translated speech and waits before its shifted start', () => {
+    const media = { currentTime: 20, readyState: 4, playbackRate: 1 };
+    assert.equal(applySyncOffset(playbackSnapshot(media), 300).positionMs, 20300);
+    assert.equal(applySyncOffset(playbackSnapshot(media), -700).positionMs, 19300);
+    const early = applySyncOffset(playbackSnapshot({ ...media, currentTime: 0.4 }), -1000);
+    assert.deepEqual([early.positionMs, early.paused, early.offsetMs], [0, true, -1000]);
+    assert.equal(normalizeSyncOffset('abc'), 0);
+    assert.equal(normalizeSyncOffset(123), 100);
+    assert.equal(normalizeSyncOffset(99999), 5000);
+    assert.equal(normalizeSyncOffset(-99999), -5000);
+});
+test('changing the sync offset reaches native audio at once with the shifted position', async () => {
+    const h = await harness(); await h.api.toggleVot();
+    for (let i = 0; i < 3; i++) await h.tick();
+    const before = h.commands.filter(command => command.action === 'sync').length;
+    await h.setting('votSyncOffsetMs', 400);
+    const syncs = h.commands.filter(command => command.action === 'sync');
+    assert.equal(syncs.length, before + 1);
+    assert.equal(syncs.at(-1).offsetMs, 400);
+    assert.equal(syncs.at(-1).positionMs, 12400);
+    assert.equal(syncs.at(-1).paused, false);
 });
 test('resume and playback speed follow video state', async () => {
     const h = await harness(); await h.api.toggleVot();
