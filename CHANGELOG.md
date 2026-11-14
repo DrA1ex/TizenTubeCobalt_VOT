@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## v9.2 — quick volume and smooth translation start
 
 - Adds **Volume and sync** to the audio menu in the player: make the translation or the original louder or quieter in 10% steps without opening settings. Translation sync moved into the same section. The volumes are saved for all videos.
 - Keeps the original audio quiet under the translation when the player restores its own volume, for example after a quality change.
 - Translated speech no longer speeds up when it starts: the start-up delay is learned and skipped instead, so a translation starts in place, at most a moment later.
+- Includes Cobalt 27.lts.3 Android packages for `armeabi-v7a`, `arm64-v8a`, and `x86`.
 
 ## v9.1 — translation sync
 
