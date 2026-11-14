@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Adds **Volume and sync** to the audio menu in the player: make the translation or the original louder or quieter in 10% steps without opening settings. Translation sync moved into the same section. The volumes are saved for all videos.
+- Keeps the original audio quiet under the translation when the player restores its own volume, for example after a quality change.
+- Translated speech no longer speeds up when it starts: the start-up delay is learned and skipped instead, so a translation starts in place, at most a moment later.
+
 ## v9.1 — translation sync
 
 - Adds **Translation sync** to the audio menu: move the Yandex translation earlier or later in 0.1 s and 0.5 s steps (up to ±5 s). The setting is saved for all videos.

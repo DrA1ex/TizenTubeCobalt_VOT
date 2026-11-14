@@ -69,7 +69,7 @@ async function menuHarness() {
 }
 test('real audio menu sections are short; absent YouTube tracks are not offered as ready choices', async () => {
     const h = await menuHarness();
-    for (const section of ['main', 'tracks', 'youtube', 'waiting', 'language', 'account', 'sync']) {
+    for (const section of ['main', 'tracks', 'youtube', 'waiting', 'language', 'account', 'sync', 'volume']) {
         h.api.showAudioMenu(section);
         assert.ok(h.last.items.length <= 5, section);
     }
@@ -128,7 +128,7 @@ test('native audio entries can be removed without inserting a second settings en
 test('translation sync menu shifts the saved offset and keeps focus on the pressed row', async () => {
     const h = await menuHarness();
     h.config.votSyncOffsetMs = 0;
-    h.api.showAudioMenu();
+    h.api.showAudioMenu('volume');
     const entry = h.last.items.find(row => row.commands[0].customAction.parameters?.section === 'sync');
     assert.equal(entry.title.subtitle, 'No shift');
     h.api.showAudioMenu('sync');
@@ -152,4 +152,35 @@ test('translation sync menu shifts the saved offset and keeps focus on the press
     await h.api.audioMenuAction('AUDIO_SYNC', { reset: true });
     assert.equal(h.config.votSyncOffsetMs, 0);
     assert.equal(h.last.focus, 4);
+});
+
+test('quick volume menu steps both saved volumes and keeps focus on the pressed row', async () => {
+    const h = await menuHarness();
+    h.config.votSyncOffsetMs = 0;
+    h.api.showAudioMenu();
+    const entry = h.last.items.find(row => row.commands[0].customAction.parameters?.section === 'volume');
+    assert.equal(entry.title.subtitle, 'Translation 100% · Original 20% · No shift');
+    h.api.showAudioMenu('volume');
+    assert.equal(h.last.items.length, 5);
+    assert.equal(h.last.items.map(row => row.title.title).join(' | '),
+        'Translation louder | Translation quieter | Original louder | Original quieter | Translation sync');
+    const press = index => h.api.audioMenuAction('AUDIO_VOLUME_STEP', h.last.items[index].commands[0].customAction.parameters);
+    await press(0); // already at the maximum
+    assert.equal(h.config.votTranslationVolume, '1');
+    await press(1); await press(1); await press(1);
+    assert.equal(h.config.votTranslationVolume, '0.7');
+    assert.equal(h.last.focus, 1);
+    assert.equal(h.last.uniqueId, 'tt-audio-volume');
+    assert.equal(h.last.update, 'replace');
+    assert.equal(h.last.items[1].title.subtitle, 'Translation · 70%');
+    await press(2);
+    assert.equal(h.config.votOriginalVolume, '0.3'); // the settings radio value, not 0.30000000000000004
+    assert.equal(h.last.focus, 2);
+    for (let i = 0; i < 5; i++) await press(3);
+    assert.equal(h.config.votOriginalVolume, '0');
+    assert.equal(h.last.header.subtitle, 'Translation 70% · Original 0% · Saved for all videos');
+    const radio = h.preferences.audioVolumeSettings().options[0].options.map(option => option.value);
+    assert.ok(radio.includes(h.config.votTranslationVolume));
+    await h.api.audioMenuAction('AUDIO_VOLUME_STEP', { key: 'votSyncOffsetMs', delta: 0.1 });
+    assert.equal(h.config.votSyncOffsetMs, 0); // only the two volume keys can be stepped
 });

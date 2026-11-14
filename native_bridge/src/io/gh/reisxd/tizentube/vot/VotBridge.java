@@ -82,6 +82,12 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             if (current == VotBridge.this && heldStartMs >= 0) reconcilePlayer();
         }
     };
+    // The last start() of speech. Its first moments are not sped up: start-up
+    // delay is learned and skipped instead (see AudioDrift.START_SETTLE_MS).
+    private long startedAt;
+    private boolean startFromHold;
+    private boolean startProbed;
+    private int startSkips;
     private float appliedRate = 1.0f;
     private final AudioDrift drift = new AudioDrift();
     private MediaPlayer player;
@@ -650,9 +656,11 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             return;
         }
         if (!shouldPlay && player.isPlaying()) player.pause();
+        if (!shouldPlay) startSkips = 0;
         if (seekInFlight) return;
+        boolean fromHold = false;
         if (heldStartMs >= 0) {
-            int wait = seekPending ? -1 : AudioDrift.startWait(heldStartMs, desiredPosition);
+            int wait = seekPending ? -1 : drift.startWait(heldStartMs, desiredPosition);
             if (wait < 0 || wait > heldWindowMs) {
                 // The video passed the held position (a slow seek) or jumped away.
                 clearHeldStart();
@@ -667,9 +675,33 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
             } else {
                 clearHeldStart();
                 drift.reset();
+                fromHold = true;
             }
         }
-        float speed = drift.speed(pendingRate, desiredPosition - player.getCurrentPosition());
+        int driftMs = desiredPosition - player.getCurrentPosition();
+        boolean settling = false;
+        if (shouldPlay && startedAt > 0 && player.isPlaying()) {
+            long since = SystemClock.elapsedRealtime() - startedAt;
+            if (since < AudioDrift.START_SETTLE_MS) {
+                settling = true;
+                if (since >= AudioDrift.START_PROBE_MS) {
+                    if (!startProbed) {
+                        startProbed = true;
+                        if (startFromHold) drift.heldStartMeasured(driftMs);
+                    }
+                    // Skip the start-up delay rather than speed speech up to cover it.
+                    if (startSkips < 2 && AudioDrift.skipAfterStart(driftMs)) {
+                        startSkips++;
+                        seekPending = true;
+                    }
+                }
+            }
+        }
+        float speed = drift.speed(pendingRate, driftMs);
+        if (settling && !Float.isNaN(speed)) {
+            drift.reset();
+            speed = pendingRate;
+        }
         if (Float.isNaN(speed) || seekPending) {
             seekPending = false;
             drift.reset();
@@ -693,7 +725,12 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 player.setPlaybackParams(player.getPlaybackParams().setSpeed(speed));
                 appliedRate = speed;
             }
-            if (!player.isPlaying()) player.start();
+            if (!player.isPlaying()) {
+                player.start();
+                startedAt = SystemClock.elapsedRealtime();
+                startFromHold = fromHold;
+                startProbed = false;
+            }
             state = "playing";
         } else {
             if (player.isPlaying()) player.pause();
@@ -745,6 +782,9 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 if (player != mediaPlayer) return;
                 prepared = true;
                 if (!foreground || SystemClock.elapsedRealtime() - lastHeartbeat > 1200) shouldPlay = false;
+                // Land on the video position (ahead of it while playing) and
+                // start on the video clock instead of catching up from 0.
+                seekPending = true;
                 reconcilePlayer();
                 Log.i(TAG, "Native VOT audio prepared");
             }
@@ -789,6 +829,8 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
         seekInFlight = false;
         seekPending = false;
         clearHeldStart();
+        startedAt = 0;
+        startSkips = 0;
         appliedRate = 1.0f;
         drift.reset();
         if (player != null) {
@@ -836,6 +878,7 @@ public final class VotBridge implements CobaltJavaScriptAndroidObject {
                 result.put("offsetMs", appliedOffsetMs);
                 result.put("seekMarginMs", drift.seekMarginMs());
                 result.put("heldStartMs", heldStartMs);
+                result.put("startLeadMs", drift.startLeadMs());
             }
             return result.toString();
         } catch (Exception error) {

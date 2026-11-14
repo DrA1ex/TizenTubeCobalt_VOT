@@ -21,9 +21,24 @@ public class AudioDriftTest {
         check(drift.seekMarginMs() == 3000); // cap
         drift.reset();
         check(drift.seekMarginMs() == 3000); // reset keeps the device seek time
-        check(AudioDrift.startWait(31000, 30400) == 600); // held ahead: wait
-        check(AudioDrift.startWait(31000, 31060) == 0); // slightly late: start now
-        check(AudioDrift.startWait(31000, 31200) == -1); // the video passed it: seek again
-        System.out.println("AudioDrift: 18 checks passed");
+        check(drift.startWait(31000, 30400) == 600); // held ahead: wait
+        check(drift.startWait(31000, 31060) == 0); // slightly late: start now
+        check(drift.startWait(31000, 31200) == -1); // the video passed it: seek again
+        drift.heldStartMeasured(240); // speech started 240 ms late
+        check(drift.startLeadMs() == 120); // start() is issued earlier next time
+        check(drift.startWait(31000, 30400) == 480); // the held start comes earlier
+        check(drift.seekTarget(30000, true) == 30000 + 3000 + 120); // the landing covers the lead
+        check(drift.startWait(drift.seekTarget(30000, true), 30000) == 3000); // so a fast seek waits the margin
+        check(drift.seekTarget(30000, false) == 30000); // still exact while paused
+        drift.heldStartMeasured(-400); // overshoot: speech started early
+        check(drift.startLeadMs() == 0); // floor
+        drift.heldStartMeasured(5000); // a coarse or stalled position
+        check(drift.startLeadMs() == 600); // cap
+        drift.reset();
+        check(drift.startLeadMs() == 600); // reset keeps the device latency
+        check(AudioDrift.skipAfterStart(200)); // start-up delay: skip, not speed up
+        check(!AudioDrift.skipAfterStart(120)); // small delay: wait for the settle window
+        check(!AudioDrift.skipAfterStart(-300)); // speech ahead: never skip further ahead
+        System.out.println("AudioDrift: 31 checks passed");
     }
 }

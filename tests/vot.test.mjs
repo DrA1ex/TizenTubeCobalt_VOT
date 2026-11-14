@@ -189,6 +189,17 @@ test('changing both volumes immediately updates active playback', async () => {
     assert.equal(h.media.volume, 0); assert.equal(h.commands.at(-1).volume, 0.4);
     h.api.stopVot(); assert.equal(h.media.volume, 0.8);
 });
+test('a volume the player restores on the video is ducked again as the new base', async () => {
+    const h = await harness(); await h.api.toggleVot();
+    assert.ok(Math.abs(h.media.volume - 0.16) < 1e-9); // 0.8 x 20%
+    h.media.volume = 1; await h.event('volumechange'); // a media source reload
+    assert.ok(Math.abs(h.media.volume - 0.2) < 1e-9);
+    h.media.volume = 0.5; await h.tick(); // no event: the periodic check catches it
+    assert.ok(Math.abs(h.media.volume - 0.1) < 1e-9);
+    await h.event('volumechange'); // our own write does not compound
+    assert.ok(Math.abs(h.media.volume - 0.1) < 1e-9);
+    h.api.stopVot(); assert.equal(h.media.volume, 0.5);
+});
 test('YouTube mute also mutes the translation', async () => {
     const h = await harness(); await h.api.toggleVot();
     h.media.muted = true; await h.tick(); assert.equal(h.commands.at(-1).volume, 0);
